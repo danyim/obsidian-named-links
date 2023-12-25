@@ -3,7 +3,7 @@ import { Plugin, MarkdownView, Editor } from "obsidian";
 import {
 	AutoLinkTitleSettings,
 	AutoLinkTitleSettingTab,
-	DEFAULT_SETTINGS
+	DEFAULT_SETTINGS,
 } from "./settings";
 import { CheckIf } from "checkif";
 import getPageTitle from "scraper";
@@ -23,8 +23,8 @@ export default class AutoLinkTitle extends Plugin {
 
 		this.blacklist = this.settings.websiteBlacklist
 			.split(",")
-			.map(s => s.trim())
-			.filter(s => s.length > 0);
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
 
 		// Listen to paste event
 		this.pasteFunction = this.pasteUrlWithTitle.bind(this);
@@ -32,20 +32,20 @@ export default class AutoLinkTitle extends Plugin {
 		this.addCommand({
 			id: "auto-link-title-paste",
 			name: "Paste URL and auto fetch title",
-			editorCallback: editor => this.manualPasteUrlWithTitle(editor),
-			hotkeys: []
+			editorCallback: (editor) => this.manualPasteUrlWithTitle(editor),
+			hotkeys: [],
 		});
 
 		this.addCommand({
 			id: "auto-link-title-normal-paste",
 			name: "Normal paste (no fetching behavior)",
-			editorCallback: editor => this.normalPaste(editor),
+			editorCallback: (editor) => this.normalPaste(editor),
 			hotkeys: [
 				{
 					modifiers: ["Mod", "Shift"],
-					key: "v"
-				}
-			]
+					key: "v",
+				},
+			],
 		});
 
 		this.registerEvent(
@@ -55,13 +55,13 @@ export default class AutoLinkTitle extends Plugin {
 		this.addCommand({
 			id: "enhance-url-with-title",
 			name: "Enhance existing URL with link and title",
-			editorCallback: editor => this.addTitleToLink(editor),
+			editorCallback: (editor) => this.addTitleToLink(editor),
 			hotkeys: [
 				{
 					modifiers: ["Mod", "Shift"],
-					key: "e"
-				}
-			]
+					key: "e",
+				},
+			],
 		});
 
 		this.addSettingTab(new AutoLinkTitleSettingTab(this.app, this));
@@ -95,14 +95,14 @@ export default class AutoLinkTitle extends Plugin {
 
 	// Simulate standard paste but using editor.replaceSelection with clipboard text since we can't seem to dispatch a paste event.
 	async manualPasteUrlWithTitle(editor: Editor): Promise<void> {
+		const clipboardText = await navigator.clipboard.readText();
+		if (clipboardText == null || clipboardText == "") return;
+
 		// Only attempt fetch if online
 		if (!navigator.onLine) {
 			editor.replaceSelection(clipboardText);
 			return;
 		}
-
-		var clipboardText = await navigator.clipboard.readText();
-		if (clipboardText == null || clipboardText == "") return;
 
 		// If its not a URL, we return false to allow the default paste handler to take care of it.
 		// Similarly, image urls don't have a meaningful <title> attribute so downloading it
@@ -141,20 +141,25 @@ export default class AutoLinkTitle extends Plugin {
 		clipboard: ClipboardEvent,
 		editor: Editor
 	): Promise<void> {
-		if (!this.settings.enhanceDefaultPaste) {
+		if (
+			!this.settings.enhanceDefaultPaste ||
+			// Only attempt fetch if online
+			!navigator.onLine
+		) {
 			return;
 		}
 
-		// Only attempt fetch if online
-		if (!navigator.onLine) return;
-
-		let clipboardText = clipboard.clipboardData.getData("text/plain");
+		let clipboardText = clipboard.clipboardData?.getData("text/plain");
 		if (clipboardText === null || clipboardText === "") return;
 
 		// If its not a URL, we return false to allow the default paste handler to take care of it.
 		// Similarly, image urls don't have a meaningful <title> attribute so downloading it
 		// to fetch the title is a waste of bandwidth.
-		if (!CheckIf.isUrl(clipboardText) || CheckIf.isImage(clipboardText)) {
+		if (
+			!clipboardText ||
+			!CheckIf.isUrl(clipboardText) ||
+			CheckIf.isImage(clipboardText)
+		) {
 			return;
 		}
 
@@ -190,9 +195,9 @@ export default class AutoLinkTitle extends Plugin {
 		await this.loadSettings();
 		this.blacklist = this.settings.websiteBlacklist
 			.split(/,|\n/)
-			.map(s => s.trim())
-			.filter(s => s.length > 0);
-		return this.blacklist.some(site => url.contains(site));
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0);
+		return this.blacklist.some((site) => url.contains(site));
 	}
 
 	async convertUrlToTitledLink(editor: Editor, url: string): Promise<void> {
@@ -252,7 +257,8 @@ export default class AutoLinkTitle extends Plugin {
 
 	public getUrlFromLink(link: string): string {
 		let urlRegex = new RegExp(DEFAULT_SETTINGS.linkRegex);
-		return urlRegex.exec(link)[2];
+		// TODO(DY): Added || ""
+		return urlRegex.exec(link)?.[2] || "";
 	}
 
 	// Custom hashid by @shabegom

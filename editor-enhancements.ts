@@ -15,10 +15,12 @@ export class EditorExtensions {
 		return editor.getSelection();
 	}
 
-	private static cursorWithinBoundaries(
+	private static isCursorWithinBoundaries(
 		cursor: EditorPosition,
 		match: RegExpMatchArray
 	): boolean {
+		if (!match.index) return false;
+
 		let startIndex = match.index;
 		let endIndex = match.index + match[0].length;
 
@@ -37,13 +39,13 @@ export class EditorExtensions {
 		let linksInLine = lineText.matchAll(DEFAULT_SETTINGS.linkLineRegex);
 
 		for (let match of linksInLine) {
-			if (this.cursorWithinBoundaries(cursor, match)) {
+			if (this.isCursorWithinBoundaries(cursor, match) && match.index) {
 				return {
 					start: { line: cursor.line, ch: match.index },
 					end: {
 						line: cursor.line,
-						ch: match.index + match[0].length
-					}
+						ch: match.index + match[0].length,
+					},
 				};
 			}
 		}
@@ -52,20 +54,20 @@ export class EditorExtensions {
 		let urlsInLine = lineText.matchAll(DEFAULT_SETTINGS.lineRegex);
 
 		for (let match of urlsInLine) {
-			if (this.cursorWithinBoundaries(cursor, match)) {
+			if (this.isCursorWithinBoundaries(cursor, match) && match.index) {
 				return {
 					start: { line: cursor.line, ch: match.index },
 					end: {
 						line: cursor.line,
-						ch: match.index + match[0].length
-					}
+						ch: match.index + match[0].length,
+					},
 				};
 			}
 		}
 
 		return {
 			start: cursor,
-			end: cursor
+			end: cursor,
 		};
 	}
 
@@ -73,7 +75,7 @@ export class EditorExtensions {
 		content: string,
 		index: number
 	): EditorPosition {
-		let substr = content.substr(0, index);
+		let substr = content.substring(0, index);
 
 		let l = 0;
 		let offset = -1;
@@ -81,7 +83,7 @@ export class EditorExtensions {
 		for (; (r = substr.indexOf("\n", r + 1)) !== -1; l++, offset = r);
 		offset += 1;
 
-		let ch = content.substr(offset, index - offset).length;
+		let ch = content.substring(offset, index - offset).length;
 
 		return { line: l, ch: ch };
 	}
