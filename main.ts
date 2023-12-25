@@ -5,8 +5,8 @@ import {
 	AutoLinkTitleSettingTab,
 	DEFAULT_SETTINGS,
 } from "./settings";
-import { CheckIf } from "checkif";
-import getPageTitle from "scraper";
+import { CheckIf } from "src/checkif";
+import getPageTitle from "src/scraper";
 
 interface PasteFunction {
 	(this: HTMLElement, ev: ClipboardEvent): void;
