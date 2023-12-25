@@ -1,10 +1,11 @@
 {
-  "id": "obsidian-auto-link-title",
-  "name": "Auto Link Title",
-  "version": "1.4.1",
-  "minAppVersion": "0.12.17",
+  "id": "obsidian-named-links",
+  "name": "Named Links",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
   "description": "This plugin automatically fetches the titles of links from the web",
-  "author": "Matt Furden",
-  "authorUrl": "https://github.com/zolrath",
+  "author": "Daniel Yim",
+  "authorUrl": "https://github.com/danyim",
+  "fundingUrl": "https://www.buymeacoffee.com/danyim",
   "isDesktopOnly": false
 }
