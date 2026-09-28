@@ -18,7 +18,7 @@ function settingsText(): Promise<string> {
   return browser.executeObsidian(({ app }) => {
     const el = (app as any).setting.activeTab?.containerEl as
       HTMLElement | undefined;
-    return (el?.innerText ?? '') as string;
+    return el?.innerText ?? '';
   });
 }
 
