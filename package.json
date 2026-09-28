@@ -28,6 +28,7 @@
   "author": "danyim",
   "license": "MIT",
   "devDependencies": {
+    "@codemirror/view": "6.38.6",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.19.0",

@@ -9,9 +9,10 @@ export function isInFrontmatter(text: string, offset: number): boolean {
   const close = /\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/g;
   close.lastIndex = 3;
   const match = close.exec(text);
-  // An unclosed block is still frontmatter while it is being typed.
-  const end = match ? match.index + match[0].length : text.length;
-  return offset > 3 && offset < end;
+  // Without a closing line it is a horizontal rule, not frontmatter, and
+  // treating it as frontmatter would stop every paste in the note.
+  if (!match) return false;
+  return offset > 3 && offset < match.index + match[0].length;
 }
 
 // Container markers a fence can sit behind: blockquote `>`s and list
@@ -82,8 +83,12 @@ export function isInCode(text: string, offset: number): boolean {
 /**
  * Whether the text just before the cursor means the URL is going into markup
  * that already says what it is: the target of a `[text](` link, a quoted
- * HTML attribute, or a `<` autolink (upstream #156).
+ * HTML attribute, a `<` autolink (upstream #156), or a `[ref]: ` reference
+ * definition, which a titled link would stop being.
  */
 export function isLinkTargetPosition(lineBefore: string): boolean {
-  return /(?:\]\(|["'<])$/.test(lineBefore);
+  return (
+    /(?:\]\(|["'<])$/.test(lineBefore) ||
+    /^\s{0,3}\[[^\]]+\]:\s*$/.test(lineBefore)
+  );
 }

@@ -21,6 +21,10 @@ describe('isInFrontmatter', () => {
     assert.equal(isInFrontmatter(...at('---\na: 1\n---\nbody |')), false);
   });
 
+  it('is false for a leading horizontal rule that never closes', () => {
+    assert.equal(isInFrontmatter(...at('---\nprose |')), false);
+  });
+
   it('is false in a note without frontmatter', () => {
     assert.equal(isInFrontmatter(...at('text\n---\n|')), false);
   });
@@ -66,6 +70,11 @@ describe('isLinkTargetPosition', () => {
     assert.equal(isLinkTargetPosition('<a href="'), true);
     assert.equal(isLinkTargetPosition("src='"), true);
     assert.equal(isLinkTargetPosition('see <'), true);
+  });
+
+  it('is true in a reference definition', () => {
+    assert.equal(isLinkTargetPosition('[1]: '), true);
+    assert.equal(isLinkTargetPosition('   [my ref]:'), true);
   });
 
   it('is false in plain prose', () => {

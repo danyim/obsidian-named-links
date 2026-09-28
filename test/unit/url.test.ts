@@ -114,6 +114,14 @@ describe('linkDestination', () => {
     assert.equal(linkDestination(url), url);
   });
 
+  it('wraps a URL with nested parentheses in angle brackets', () => {
+    // Bare, the placeholder's link couldn't be found again to replace it.
+    assert.equal(
+      linkDestination('https://en.wikipedia.org/wiki/A_(b_(c))'),
+      '<https://en.wikipedia.org/wiki/A_(b_(c))>'
+    );
+  });
+
   it('wraps a URL with an unbalanced parenthesis in angle brackets', () => {
     assert.equal(
       linkDestination('https://example.com/a)b'),
@@ -177,6 +185,36 @@ describe('findLinks and linkAt', () => {
 
   it('skips a URL in an HTML attribute', () => {
     assert.deepEqual(findLinks('<a href="https://example.com">x</a>'), []);
+  });
+
+  it('takes an autolink whole, brackets included', () => {
+    const line = 'see <https://example.com> now';
+    const link = linkAt(line, 10);
+    assert.equal(line.slice(link!.start, link!.end), '<https://example.com>');
+    assert.equal(link!.url, 'https://example.com');
+  });
+
+  it('leaves URLs that are already part of markup alone', () => {
+    for (const line of [
+      '![](https://example.com/img?id=5)',
+      '[t](https://example.com "Title")',
+      '[a [b] c](https://example.com)',
+      '[ref]: https://example.com',
+      '  [ref]:https://example.com',
+    ]) {
+      assert.deepEqual(
+        findLinks(line).filter((l) => l.text === undefined),
+        [],
+        line
+      );
+    }
+  });
+
+  it('still finds a URL in parentheses in prose', () => {
+    assert.equal(
+      findLinks('(https://example.com)')[0]?.url,
+      'https://example.com'
+    );
   });
 
   it('finds several URLs in order', () => {

@@ -142,16 +142,19 @@ export function hostnameOf(url: string): string {
 }
 
 /**
- * Formats a URL as a markdown link destination. Unbalanced parentheses would
- * end the link early, so those URLs use the `<...>` form.
+ * Formats a URL as a markdown link destination. Unbalanced or nested
+ * parentheses would end the link early, or past what the link parsers here
+ * read back, so those URLs use the `<...>` form.
  */
 export function linkDestination(url: string): string {
   let depth = 0;
+  let deepest = 0;
   for (const ch of url) {
-    if (ch === '(') depth++;
+    if (ch === '(') deepest = Math.max(deepest, ++depth);
     else if (ch === ')' && --depth < 0) break;
   }
-  return depth === 0 && !/[<>]/.test(url) ? url : `<${url}>`;
+  const plain = depth === 0 && deepest <= 1 && !/[<>]/.test(url);
+  return plain ? url : `<${url}>`;
 }
 
 export interface LinkAtCursor {
@@ -209,13 +212,23 @@ export function findLinks(line: string): LinkAtCursor[] {
     if (found.some((link) => start >= link.start && start < link.end)) {
       continue;
     }
-    // Straight after a quote or `=` it is an HTML attribute value, which
-    // belongs to the markup around it rather than being a link of its own.
-    const before = line[start - 1];
-    if (before === '"' || before === "'" || before === '=') continue;
+    const before = line.slice(0, start);
+    // A URL that is already part of markup is left to it: an HTML attribute
+    // value, the target of a link or image the pattern above didn't take
+    // (one with a title, nested brackets, or an image embed), or a
+    // reference definition's target.
+    if (/(?:["'=]|\]\()$/.test(before)) continue;
+    if (/^\s{0,3}\[[^\]]+\]:\s*$/.test(before)) continue;
     const url = trimBareUrl(match[0]);
     if (!isUrl(url)) continue;
-    found.push({ start, end: start + url.length, url });
+    const end = start + url.length;
+    // A <https://...> autolink is taken whole, brackets included, so it
+    // becomes a titled link rather than one nested inside the brackets.
+    if (before.endsWith('<') && line[end] === '>') {
+      found.push({ start: start - 1, end: end + 1, url });
+    } else if (!before.endsWith('<')) {
+      found.push({ start, end, url });
+    }
   }
 
   return found.sort((a, b) => a.start - b.start);

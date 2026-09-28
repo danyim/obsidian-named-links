@@ -3,7 +3,16 @@
  * inserts, puts placeholders in straight away, and swaps each for its title
  * once it arrives.
  */
-import { App, Editor, EditorPosition, Notice, TFile } from 'obsidian';
+import { EditorView } from '@codemirror/view';
+import {
+  App,
+  Editor,
+  EditorChange,
+  EditorPosition,
+  MarkdownView,
+  Notice,
+  TFile,
+} from 'obsidian';
 
 import { isInCode, isInFrontmatter, isLinkTargetPosition } from './context';
 import { t } from './lang';
@@ -55,6 +64,33 @@ function newPlaceholder(): string {
     suffix += (id >>> bit) & 1 ? '\u200c' : '\u200b';
   }
   return t().placeholder + suffix;
+}
+
+/**
+ * Selected text as link text. Brackets that don't pair up would end the link
+ * text early or leave it open, so then every bracket is escaped.
+ */
+function linkText(selection: string): string {
+  let depth = 0;
+  let balanced = true;
+  for (let i = 0; i < selection.length; i++) {
+    const ch = selection[i];
+    if (ch === '\\') i++;
+    else if (ch === '[') depth++;
+    else if (ch === ']' && --depth < 0) balanced = false;
+  }
+  if (balanced && depth === 0) return selection;
+  let out = '';
+  for (let i = 0; i < selection.length; i++) {
+    const ch = selection[i];
+    if (ch === '\\') {
+      out += ch + (selection[i + 1] ?? '');
+      i++;
+    } else {
+      out += ch === '[' || ch === ']' ? `\\${ch}` : ch;
+    }
+  }
+  return out;
 }
 
 // The destination of the link a placeholder heads, matched from just after
@@ -115,14 +151,18 @@ export class Linker {
       return null;
     }
 
-    if (urls.length === 1 && selection.trim() !== '') {
+    // A selection running over several lines can't be link text.
+    if (
+      urls.length === 1 &&
+      this.settings.useSelectionAsTitle &&
+      selection.trim() !== '' &&
+      !selection.includes('\n')
+    ) {
       const url = toAbsoluteUrl(unwrapAutolink(urls[0])) as string;
-      if (this.settings.useSelectionAsTitle) {
-        return {
-          text: `[${selection}](${linkDestination(url)})`,
-          pending: [],
-        };
-      }
+      return {
+        text: `[${linkText(selection)}](${linkDestination(url)})`,
+        pending: [],
+      };
     }
 
     const excluded = parseExcludedSites(this.settings.excludedSites);
@@ -164,6 +204,18 @@ export class Linker {
     await Promise.all(pending.map((item) => this.resolve(editor, file, item)));
   }
 
+  /** The editors of every open markdown view showing `file`. */
+  private editorsShowing(file: TFile): Editor[] {
+    return this.host.app.workspace
+      .getLeavesOfType('markdown')
+      .map((leaf) => leaf.view)
+      .filter(
+        (view): view is MarkdownView =>
+          view instanceof MarkdownView && view.file?.path === file.path
+      )
+      .map((view) => view.editor);
+  }
+
   private async resolve(
     editor: Editor,
     file: TFile | null,
@@ -185,37 +237,47 @@ export class Linker {
         ? item.fallback
         : `[${formatTitle(title, this.settings.maxTitleLength)}](${destination})`;
 
-    const text = editor.getValue();
-    const found = locatePlaceholder(text, item.placeholder);
-    if (found) {
-      editor.replaceRange(
-        replacement(found.destination),
-        editor.offsetToPos(found.start),
-        editor.offsetToPos(found.end)
-      );
-      return;
+    // The editor that took the paste, if it is still on screen, then any
+    // other editor showing the note. A closed editor's document can still
+    // hold the placeholder, but nothing would ever save a change made there.
+    const showing = file ? this.editorsShowing(file) : [];
+    const editors = isLive(editor) ? [editor, ...showing] : showing;
+    for (const candidate of editors) {
+      const found = locatePlaceholder(candidate.getValue(), item.placeholder);
+      if (found) {
+        candidate.replaceRange(
+          replacement(found.destination),
+          candidate.offsetToPos(found.start),
+          candidate.offsetToPos(found.end)
+        );
+        return;
+      }
     }
 
-    // The editor has moved on to another note, or the note was closed,
-    // before the title came back. Finish the link in the file itself rather
-    // than leave the placeholder behind.
-    if (file) {
-      await this.host.app.vault.process(file, (data) => {
-        const inFile = locatePlaceholder(data, item.placeholder);
-        if (!inFile) return data;
-        return (
-          data.slice(0, inFile.start) +
-          replacement(inFile.destination) +
-          data.slice(inFile.end)
-        );
-      });
-    }
+    // An open note without the placeholder is one the user has undone or
+    // typed over it in; writing the file would bring it back, or drop edits
+    // not yet saved. Only a markdown file can be edited as text: a canvas
+    // card's file is JSON.
+    if (!file || showing.length > 0 || file.extension !== 'md') return;
+
+    // The editor moved on to another note, or was closed, before the title
+    // came back. Finish the link in the file rather than leave the
+    // placeholder behind.
+    await this.host.app.vault.process(file, (data) => {
+      const inFile = locatePlaceholder(data, item.placeholder);
+      if (!inFile) return data;
+      return (
+        data.slice(0, inFile.start) +
+        replacement(inFile.destination) +
+        data.slice(inFile.end)
+      );
+    });
   }
 
   /**
-   * Titles the URL under the cursor, or every bare URL in the selection. A
-   * markdown link under the cursor has its text replaced with the fetched
-   * title.
+   * Titles the URL under the cursor, or every bare URL the selection
+   * touches. A markdown link under the cursor has its text replaced with the
+   * fetched title.
    */
   async enhance(editor: Editor, file: TFile | null): Promise<void> {
     if (editor.somethingSelected()) {
@@ -226,12 +288,20 @@ export class Linker {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
     const link = linkAt(line, cursor.ch);
-    if (!link) {
+    const url = link && (toAbsoluteUrl(link.url) as string);
+    if (
+      !link ||
+      !url ||
+      isImageUrl(url) ||
+      isInCode(
+        editor.getValue(),
+        editor.posToOffset({ line: cursor.line, ch: link.start })
+      )
+    ) {
       new Notice(t().notices.noUrlHere);
       return;
     }
 
-    const url = toAbsoluteUrl(link.url) as string;
     const placeholder = newPlaceholder();
     const from = { line: cursor.line, ch: link.start };
     const to = { line: cursor.line, ch: link.end };
@@ -242,6 +312,11 @@ export class Linker {
     ]);
   }
 
+  /**
+   * Every bare URL the selection touches, whole: a selection that starts or
+   * ends partway through a URL still titles all of it, rather than linking
+   * the part selected and leaving the rest trailing after the link.
+   */
   private async enhanceSelection(
     editor: Editor,
     file: TFile | null
@@ -249,37 +324,51 @@ export class Linker {
     const from = editor.getCursor('from');
     const to = editor.getCursor('to');
     const text = editor.getValue();
-    const startOffset = editor.posToOffset(from);
-    const selected = editor.getSelection();
 
     const pending: PendingTitle[] = [];
-    const lines = selected.split('\n');
-    let lineOffset = 0;
-    const rewritten = lines.map((line) => {
-      const base = startOffset + lineOffset;
-      lineOffset += line.length + 1;
-      let out = '';
-      let last = 0;
+    const changes: EditorChange[] = [];
+    for (let ln = from.line; ln <= to.line; ln++) {
+      const line = editor.getLine(ln);
+      const selStart = ln === from.line ? from.ch : 0;
+      const selEnd = ln === to.line ? to.ch : line.length;
       for (const link of findLinks(line)) {
         if (link.text !== undefined) continue;
-        if (isInCode(text, base + link.start)) continue;
+        if (link.end <= selStart || link.start >= selEnd) continue;
+        const offset = editor.posToOffset({ line: ln, ch: link.start });
+        if (isInCode(text, offset) || isInFrontmatter(text, offset)) continue;
         const url = toAbsoluteUrl(link.url) as string;
         if (isImageUrl(url)) continue;
         const placeholder = newPlaceholder();
-        pending.push({ placeholder, url, fallback: link.url });
-        out += line.slice(last, link.start);
-        out += `[${placeholder}](${linkDestination(url)})`;
-        last = link.end;
+        pending.push({
+          placeholder,
+          url,
+          fallback: line.slice(link.start, link.end),
+        });
+        changes.push({
+          from: { line: ln, ch: link.start },
+          to: { line: ln, ch: link.end },
+          text: `[${placeholder}](${linkDestination(url)})`,
+        });
       }
-      return out + line.slice(last);
-    });
+    }
 
     if (pending.length === 0) {
       new Notice(t().notices.noUrlInSelection);
       return;
     }
 
-    editor.replaceRange(rewritten.join('\n'), from, to);
+    // One transaction, so a single undo reverts every URL.
+    editor.transaction({ changes });
     await this.resolveAll(editor, file, pending);
   }
+}
+
+interface CodeMirrorHandle {
+  cm?: EditorView;
+}
+
+/** Whether an editor is still mounted, rather than torn down with its tab. */
+function isLive(editor: Editor): boolean {
+  const view = (editor as Editor & CodeMirrorHandle).cm;
+  return view ? view.dom.isConnected : true;
 }

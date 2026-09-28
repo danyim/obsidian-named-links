@@ -50,12 +50,25 @@ export default class NamedLinksPlugin extends Plugin {
   /** Per request. A field so the tests can shorten it. */
   requestTimeoutMs = REQUEST_TIMEOUT_MS;
 
-  fetchTitle = (url: string): Promise<string | null> =>
-    fetchTitle(url, {
+  /**
+   * The timeout also caps the whole lookup, not just each request: an
+   * unresponsive host would otherwise hold the placeholder through the HEAD,
+   * the GET and any oEmbed request in turn.
+   */
+  fetchTitle = (url: string): Promise<string | null> => {
+    let timer = 0;
+    const deadline = new Promise<null>((resolve) => {
+      timer = window.setTimeout(() => resolve(null), this.requestTimeoutMs);
+    });
+    const lookup = fetchTitle(url, {
       http: obsidianHttpClient(this.requestTimeoutMs),
       language: getLanguage(),
       twitterProxy: this.settings.twitterProxy,
     });
+    return Promise.race([lookup, deadline]).finally(() =>
+      window.clearTimeout(timer)
+    );
+  };
 
   async onload() {
     await this.loadSettings();
@@ -148,7 +161,9 @@ export default class NamedLinksPlugin extends Plugin {
       'keydown',
       (evt: KeyboardEvent) => {
         if (
-          evt.code === 'KeyV' &&
+          // `code` catches V on layouts whose V key types another letter,
+          // `key` catches layouts that put V somewhere else, like Dvorak.
+          (evt.code === 'KeyV' || evt.key.toLowerCase() === 'v') &&
           evt.shiftKey &&
           (evt.ctrlKey || evt.metaKey)
         ) {
@@ -160,9 +175,15 @@ export default class NamedLinksPlugin extends Plugin {
     this.registerDomEvent(win, 'dragstart', () => {
       this.dragStartedInApp = true;
     });
-    this.registerDomEvent(win, 'dragend', () => {
-      this.dragStartedInApp = false;
-    });
+    // dragend goes to the drag's source, which a drop into the editor can
+    // re-render out of the document before the event bubbles here. The drop
+    // itself reaches the window once the editor has handled it, so either
+    // ends the drag.
+    for (const type of ['dragend', 'drop'] as const) {
+      this.registerDomEvent(win, type, () => {
+        this.dragStartedInApp = false;
+      });
+    }
   }
 
   /**
@@ -183,6 +204,9 @@ export default class NamedLinksPlugin extends Plugin {
   }
 
   private planInsert(editor: Editor, text: string) {
+    // With several cursors the same placeholder would go in at each of them,
+    // and only one could ever be replaced.
+    if (editor.listSelections().length > 1) return null;
     if (this.linker.isRawContext(editor, editor.getCursor('from'))) {
       return null;
     }

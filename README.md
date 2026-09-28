@@ -21,13 +21,14 @@ becomes
 
 - **Pasting a URL** inserts a `[Fetching title…](url)` placeholder straight away, then swaps in the page title once it arrives. Several URLs pasted at once, one per line or separated by spaces, are each titled.
 - **Dropping a URL** dragged in from a browser or another app does the same, at the spot where you drop it.
-- **Add a title to an existing URL** (a command, so give it a hotkey under Settings → Hotkeys) titles the URL under the cursor. On an existing `[text](url)` link it replaces the text with the fetched title. With text selected, it titles every bare URL in the selection.
+- **Add a title to an existing URL** (a command, so give it a hotkey under Settings → Hotkeys) titles the URL under the cursor. On an existing `[text](url)` link it replaces the text with the fetched title, and a `<URL>` autolink becomes a titled link. With text selected, it titles every bare URL the selection touches, skipping code, frontmatter, and URLs that are already part of a link, image or reference definition.
 - **Paste URL and fetch its title** and **Paste without fetching a title** are commands too, for binding to hotkeys of your own.
 
 The URL is left exactly as pasted when:
 
 - you paste with **Ctrl/Cmd+Shift+V**, Obsidian's paste-as-plain-text shortcut;
-- it goes into a link target (`[text](`), an HTML attribute (`href="`), or after a `<`;
+- it goes into a link target (`[text](`), a reference definition (`[1]: `), an HTML attribute (`href="`), or after a `<`;
+- you paste with several cursors;
 - it goes into a code block, inline code or frontmatter (this can be turned off);
 - it is an image, so it can still be embedded;
 - the site is on your excluded list;

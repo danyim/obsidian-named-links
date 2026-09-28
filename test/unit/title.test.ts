@@ -24,6 +24,10 @@ describe('truncateTitle', () => {
     assert.equal(truncateTitle('abcdef', 5), 'abcde…');
     assert.equal(truncateTitle('abcd efgh', 5), 'abcd…');
   });
+
+  it('never cuts an emoji in half', () => {
+    assert.equal(truncateTitle('ab😀cd', 3), 'ab😀…');
+  });
 });
 
 describe('escapeMarkdown', () => {
@@ -37,7 +41,9 @@ describe('escapeMarkdown', () => {
     ['Key:: value', 'Key\\:\\: value'],
     ['#tag and C# and # heading', '\\#tag and C# and # heading'],
     ['^footnote', '\\^footnote'],
-    ['already \\[escaped\\]', 'already \\[escaped\\]'],
+    // Titles come from HTML, so a backslash is a real one and is kept.
+    ['Escape \\$ in bash', 'Escape \\\\\\$ in bash'],
+    ['C:\\\\server', 'C:\\\\\\\\server'],
     ['back\\slash', 'back\\\\slash'],
   ];
   for (const [input, expected] of cases) {
