@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/danyim/obsidian-named-links#readme
+    about: What gets titled, the settings, and moving over from Auto Link Title are covered in the README.
+  - name: Original plugin (Auto Link Title)
+    url: https://github.com/zolrath/obsidian-auto-link-title/issues
+    about: If you're running the original Auto Link Title rather than Named Links, that's its tracker.
