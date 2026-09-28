@@ -1,5 +1,5 @@
 # vscode
-.vscode 
+.vscode
 
 # Intellij
 *.iml
@@ -12,5 +12,25 @@ node_modules
 # They should be uploaded to GitHub releases instead.
 main.js
 
+# Exclude sourcemaps
+*.map
+
+# obsidian
 data.json
-/bun.lockb
+# ...but the test fixtures need theirs committed.
+!test/vaults/**/data.json
+
+# Exclude macOS Finder (System Explorer) View States
+.DS_Store
+
+# Worktrees Claude Code creates inside the repo. Only the generated worktrees,
+# so a deliberate .claude/settings.json can still be committed.
+.claude/worktrees/
+
+# e2e testing
+.obsidian-cache
+test/screenshots
+obsidian-versions-lock.txt
+
+# Obsidian Insiders credentials for beta testing
+.env
