@@ -1,11 +1,11 @@
 {
-  "id": "obsidian-named-links",
-  "name": "Named Links",
-  "version": "1.0.0",
-  "minAppVersion": "0.15.0",
-  "description": "This plugin automatically fetches the titles of links from the web",
-  "author": "Daniel Yim",
-  "authorUrl": "https://github.com/danyim",
-  "fundingUrl": "https://www.buymeacoffee.com/danyim",
-  "isDesktopOnly": false
+	"id": "named-links",
+	"name": "Named Links",
+	"version": "1.0.0",
+	"minAppVersion": "1.13.0",
+	"description": "Fetch the title of a pasted or dropped URL and insert it as a markdown link.",
+	"author": "danyim",
+	"authorUrl": "https://github.com/danyim",
+	"fundingUrl": "https://buymeacoffee.com/danyim",
+	"isDesktopOnly": false
 }

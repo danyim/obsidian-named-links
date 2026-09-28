@@ -1,0 +1,114 @@
+name: Bug report
+description: Something in Named Links doesn't work the way it should
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report.
+
+        Named Links is a fork of
+        [Auto Link Title](https://github.com/zolrath/obsidian-auto-link-title).
+        If you're running the original plugin rather than this one, the bug
+        belongs there; the two are separate plugins and don't share any state.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before reporting
+      options:
+        - label: I searched the existing issues and didn't find this one.
+          required: true
+        - label: I'm running **Named Links**, not the original Auto Link Title.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you see? What did you expect to see instead?
+      placeholder: Pasting a link to example.com left the URL as it was instead of adding the page title.
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      description: |
+        The URL that misbehaved, or one that behaves the same way. Most title
+        problems depend on the site. Leave it out if it's private.
+      placeholder: https://example.com/some/page
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The smallest sequence that reproduces it: where the cursor was, how you
+        pasted (menu, Ctrl/Cmd+V, a command, drag and drop), and what was around
+        the cursor in the note.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Named Links version
+      description: Settings → Community plugins → Named Links
+      placeholder: 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian version
+      description: |
+        Help → Show debug info. Please include both the Obsidian and installer
+        versions if they differ.
+      placeholder: v1.13.7 (installer v1.13.7)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Desktop (Linux)
+        - Desktop (macOS)
+        - Desktop (Windows)
+        - Mobile (iOS / iPadOS)
+        - Mobile (Android)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: isolated
+    attributes:
+      label: Isolation
+      description: |
+        Optional, but it saves a round trip. Other plugins that handle pasting
+        (Auto Link Title especially) can take the paste first.
+      options:
+        - label: Still happens with other community plugins disabled.
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: |
+        Any errors from the developer console (Ctrl/Cmd + Shift + I → Console).
+        This is automatically formatted as code, so no backticks needed.
+      render: text
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Screenshots, your settings, whatever seems relevant.
