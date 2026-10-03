@@ -41,7 +41,7 @@ Titles are cleaned up before they go in: line breaks become spaces, and characte
 
 ## Settings
 
-![The Named Links settings tab in full, in light and dark mode: when to fetch titles, the title clean-up and length settings, the FxTwitter option, and excluded sites](screenshots/settings.png)
+![The Named Links settings tab in full, in light and dark mode: when to fetch titles, the title clean-up and length settings, the FxTwitter option, excluded sites, and the link format](screenshots/settings.png)
 
 On a phone the same settings stack into one column:
 
