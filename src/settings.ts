@@ -29,7 +29,7 @@ export interface NamedLinksSettings {
 export const DEFAULT_SETTINGS: NamedLinksSettings = {
   enhancePaste: true,
   enhanceDrop: true,
-  useSelectionAsTitle: false,
+  useSelectionAsTitle: true,
   skipCodeAndFrontmatter: true,
   maxTitleLength: 0,
   removeSiteName: false,

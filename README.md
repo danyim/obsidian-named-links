@@ -51,7 +51,7 @@ On a phone the same settings stack into one column:
 | --- | --- | --- |
 | Title pasted URLs | On | Fetch the title when a URL is pasted with the normal paste command. |
 | Title dropped URLs | On | Fetch the title when a URL is dropped into the editor. |
-| Use the selection as the title | Off | Pasting a URL over selected text links that text instead of fetching. |
+| Use the selection as the title | On | Pasting a URL over selected text links that text instead of fetching. Turn it off to replace the selection with the fetched title. |
 | Skip code and frontmatter | On | Leave URLs pasted into code or frontmatter alone. |
 | Remove the site name | Off | Drop the site's name from the start or end of a title: `Video - YouTube` becomes `Video`. See [Cleaning up titles](#cleaning-up-titles). |
 | Title rules | Empty | Your own find/replace rules for titles. See [Cleaning up titles](#cleaning-up-titles). |

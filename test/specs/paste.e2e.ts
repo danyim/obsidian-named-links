@@ -265,7 +265,8 @@ describe('Pasting a URL', function () {
   });
 
   describe('over a selection', function () {
-    it('replaces the selection with the titled link', async function () {
+    it('replaces the selection with the titled link when set to', async function () {
+      await setSettings({ useSelectionAsTitle: false });
       await openNote('see «this» now');
       const url = `${base}/page?title=Fetched`;
       await paste(url);
@@ -273,8 +274,7 @@ describe('Pasting a URL', function () {
       expect(await editorValue()).toBe(`see [Fetched](${url}) now`);
     });
 
-    it('links the selected text when set to', async function () {
-      await setSettings({ useSelectionAsTitle: true });
+    it('links the selected text by default', async function () {
       await openNote('see «this text» now');
       const url = `${base}/page`;
       await paste(url);

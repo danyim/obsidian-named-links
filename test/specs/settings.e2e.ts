@@ -77,13 +77,14 @@ describe('Settings tab', function () {
       (row.querySelector('.checkbox-container') as HTMLElement).click();
     });
     await browser.waitUntil(
-      async () => (await getSettings()).useSelectionAsTitle === true,
+      // On by default, so the click turns it off.
+      async () => (await getSettings()).useSelectionAsTitle === false,
       { timeoutMsg: 'toggle did not reach the settings' }
     );
     const saved = await browser.executeObsidian(({ app }) =>
       (app as any).plugins.plugins['named-links'].loadData()
     );
-    expect(saved.useSelectionAsTitle).toBe(true);
+    expect(saved.useSelectionAsTitle).toBe(false);
   });
 
   it('saves the excluded sites text', async function () {
