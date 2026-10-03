@@ -16,6 +16,9 @@ const log: LoggedRequest[] = [];
 let server: http.Server | null = null;
 let base: Promise<string> | null = null;
 
+/** The title the /hostile page decodes to. */
+export const HOSTILE_TITLE = 'He said "hi" \\ <b>x</b> ] ) [y](z) & \'q\' *n*';
+
 const GBK_TITLE = Buffer.from('d6d0cec4b1eacce2', 'hex'); // 中文标题
 
 function page(title: string): string {
@@ -53,6 +56,14 @@ function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     case '/markdown':
       return html(page('A *bold* [claim] | with `code` &amp; $5'));
+    case '/hostile':
+      // Every character that could end a link's text, target, title
+      // attribute or HTML tag. Reads as HOSTILE_TITLE once decoded.
+      return html(
+        page(
+          "He said &quot;hi&quot; \\ &lt;b&gt;x&lt;/b&gt; ] ) [y](z) &amp; 'q' *n*"
+        )
+      );
     case '/multiline':
       return html(page('First line\n   second line'));
     case '/og':

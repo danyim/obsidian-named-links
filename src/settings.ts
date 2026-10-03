@@ -1,4 +1,5 @@
 /** The settings shape, defaults, and the rules that read them. */
+import { DEFAULT_TEMPLATE, LINK_FORMATS, LinkFormat } from './linkFormat';
 import { domainOf, hostMatchesDomain, toAbsoluteUrl } from './url';
 
 /** What an excluded site's URL becomes when pasted. */
@@ -26,6 +27,9 @@ export interface NamedLinksSettings {
   /** Sites never fetched, one per line or comma separated. */
   excludedSites: string;
   excludedSiteFormat: ExcludedSiteFormat;
+  /** A preset link format, or `custom` for `customLinkFormat`. */
+  linkFormat: LinkFormat;
+  customLinkFormat: string;
 }
 
 export const DEFAULT_SETTINGS: NamedLinksSettings = {
@@ -40,6 +44,8 @@ export const DEFAULT_SETTINGS: NamedLinksSettings = {
   twitterProxy: false,
   excludedSites: '',
   excludedSiteFormat: 'url',
+  linkFormat: 'markdown',
+  customLinkFormat: DEFAULT_TEMPLATE,
 };
 
 /** Merges stored data over the defaults, dropping keys of the wrong type. */
@@ -53,6 +59,12 @@ export function mergeSettings(stored: unknown): NamedLinksSettings {
   }
   if (!['url', 'domain'].includes(result.excludedSiteFormat)) {
     result.excludedSiteFormat = DEFAULT_SETTINGS.excludedSiteFormat;
+  }
+  if (
+    result.linkFormat !== 'custom' &&
+    !Object.keys(LINK_FORMATS).includes(result.linkFormat)
+  ) {
+    result.linkFormat = DEFAULT_SETTINGS.linkFormat;
   }
   if (!Number.isFinite(result.maxTitleLength) || result.maxTitleLength < 0) {
     result.maxTitleLength = 0;

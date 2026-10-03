@@ -205,6 +205,8 @@ export async function resetPlugin(): Promise<void> {
       twitterProxy: false,
       excludedSites: '',
       excludedSiteFormat: 'url',
+      linkFormat: 'markdown',
+      customLinkFormat: '[{title}]({url})',
     };
     p.requestTimeoutMs = 15000;
     await p.saveSettings();
@@ -294,4 +296,32 @@ export async function captureRendering(
     if (target !== main) await browser.switchToWindow(main);
   }
   return file;
+}
+
+export interface RenderedLink {
+  text: string;
+  href: string | null;
+  title: string | null;
+}
+
+/**
+ * The links `markdown` renders to, through Obsidian's own renderer, so a
+ * spec can check that a title came out as text rather than as markup.
+ */
+export async function renderedLinks(markdown: string): Promise<RenderedLink[]> {
+  return await browser.executeObsidian(async ({ app, obsidian }, markdown) => {
+    const el = createDiv();
+    const component = new obsidian.Component();
+    component.load();
+    try {
+      await obsidian.MarkdownRenderer.render(app, markdown, el, '', component);
+      return Array.from(el.querySelectorAll('a')).map((a) => ({
+        text: a.textContent ?? '',
+        href: a.getAttribute('href'),
+        title: a.getAttribute('title'),
+      }));
+    } finally {
+      component.unload();
+    }
+  }, markdown);
 }

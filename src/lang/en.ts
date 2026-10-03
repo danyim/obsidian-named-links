@@ -88,6 +88,26 @@ const en = {
       url: 'The URL as it is',
       domain: 'A link titled with the domain',
     },
+    linkFormatHeading: 'Link format',
+    linkFormat: {
+      name: 'Link format',
+      desc: 'How a finished link is written.',
+      markdown: 'Markdown link',
+      markdownTitle: 'Markdown link with a hover title',
+      html: 'HTML link',
+      custom: 'Custom',
+    },
+    customLinkFormat: {
+      name: 'Custom format',
+      desc: 'Use {title}, {url} and {domain}. Leave out {title} and no title is fetched.',
+    },
+    templateErrors: {
+      missingUrl: 'The format needs {url}.',
+      unknownPlaceholder: (name: string) =>
+        `{${name}} isn't a placeholder. Use {title}, {url} or {domain}.`,
+      unquotedInTag: (name: string) =>
+        `Put {${name}} inside a quoted attribute value, such as href="{${name}}".`,
+    },
   },
 };
 

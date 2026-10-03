@@ -22,10 +22,12 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `cleanup.ts` | The optional clean-up between fetching a title and shortening it: removing the site name, and the user's title rules. |
 | `context.ts` | Tells whether a position is in code, frontmatter or a link target. |
 | `settings.ts` | The settings shape and defaults, excluded-site matching, and the Auto Link Title import. |
+| `linkFormat.ts` | Renders a finished link from the link format template, escaping each placeholder for the part of the template it sits in, and validates custom templates. |
 | `settingsTab.ts` | The settings tab, through `getSettingDefinitions()`. |
 | `lang/` | UI strings: `en.ts` defines them, `ja.ts` translates them, `index.ts` picks one by Obsidian's language. |
 
-`url.ts`, `title.ts`, `cleanup.ts`, `context.ts`, `scraper.ts` and `settings.ts` don't import
+`url.ts`, `title.ts`, `cleanup.ts`, `context.ts`, `scraper.ts`, `linkFormat.ts` and
+`settings.ts` don't import
 `obsidian`, which is what lets the unit tests run them directly. Keep them that
 way; anything that needs the Obsidian API goes in the other modules.
 

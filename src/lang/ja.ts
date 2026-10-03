@@ -92,6 +92,26 @@ const ja: Strings = {
       url: 'URLをそのまま',
       domain: 'ドメイン名をタイトルにしたリンク',
     },
+    linkFormatHeading: 'リンクの形式',
+    linkFormat: {
+      name: 'リンクの形式',
+      desc: '完成したリンクの書き方。',
+      markdown: 'Markdownリンク',
+      markdownTitle: 'ホバー時のタイトル付きMarkdownリンク',
+      html: 'HTMLリンク',
+      custom: 'カスタム',
+    },
+    customLinkFormat: {
+      name: 'カスタム形式',
+      desc: '{title}、{url}、{domain} が使えます。{title} を含めない場合はタイトルを取得しません。',
+    },
+    templateErrors: {
+      missingUrl: '形式には {url} が必要です。',
+      unknownPlaceholder: (name: string) =>
+        `{${name}} はプレースホルダーではありません。{title}、{url}、{domain} を使ってください。`,
+      unquotedInTag: (name: string) =>
+        `{${name}} は href="{${name}}" のように引用符で囲んだ属性値の中に置いてください。`,
+    },
   },
 };
 

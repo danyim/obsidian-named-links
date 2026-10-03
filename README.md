@@ -41,7 +41,7 @@ Titles are cleaned up before they go in: line breaks become spaces, and characte
 
 ## Settings
 
-![The Named Links settings tab in full, in light and dark mode: when to fetch titles, the title clean-up and length settings, the FxTwitter option, and excluded sites](screenshots/settings.png)
+![The Named Links settings tab in full, in light and dark mode: when to fetch titles, the title clean-up and length settings, the FxTwitter option, excluded sites, and the link format](screenshots/settings.png)
 
 On a phone the same settings stack into one column:
 
@@ -60,6 +60,29 @@ On a phone the same settings stack into one column:
 | Fetch X posts through FxTwitter | Off | See [Privacy](#privacy). |
 | Excluded sites | Empty | Sites never fetched. `example.com` covers the domain and its subdomains; an entry with a path, or any other text, matches URLs containing it. |
 | Paste excluded sites as | The URL as it is | Or as a link titled with the domain, as Auto Link Title did. |
+| Link format | Markdown link | How a finished link is written. See [Link format](#link-format). |
+| Custom format | `[{title}]({url})` | The template used when the link format is **Custom**. |
+
+### Link format
+
+Every finished link, whether pasted, dropped, added by the command, or made from an excluded site or a selection, is written in the format you choose:
+
+| Link format | Result |
+| --- | --- |
+| Markdown link | `[Example Domain](https://example.com)` |
+| Markdown link with a hover title | `[Example Domain](https://example.com "Example Domain")` |
+| HTML link | `<a href="https://example.com">Example Domain</a>` |
+| Custom | Your own template |
+
+A custom template can use `{title}`, `{url}` and `{domain}` (the host name without `www.`), and must include `{url}`. Some examples:
+
+| Template | Result |
+| --- | --- |
+| `[source]({url})` | `[source](https://example.com)`, with no title fetched at all |
+| `[{title}]({url}) ({domain})` | `[Example Domain](https://example.com) (example.com)` |
+| `<a href="{url}" target="_blank">{title}</a>` | an HTML link that opens in a new tab |
+
+Each value is escaped for where it sits in the template, so a title holding `]`, `"`, `>` or other markup always shows as text and can't break the link: markdown escaping in link text (a `{url}` written as plain text stays as it is, so Obsidian links it), HTML escaping inside a quoted HTML attribute, and the quote and backslash escaped inside a quoted link title. A placeholder inside an HTML tag but outside quotes, such as `<a href={url}>`, is refused, since no escaping makes that safe. A template without `{title}` inserts the link straight away, with no request made.
 
 ### Cleaning up titles
 
