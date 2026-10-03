@@ -7,7 +7,7 @@ import {
   SettingDefinitionItem,
 } from 'obsidian';
 
-import { parseTitleRules } from './cleanup';
+import { RuleProblem, parseDomainTitleRules, parseTitleRules } from './cleanup';
 import { t } from './lang';
 import type NamedLinksPlugin from './main';
 import {
@@ -49,13 +49,12 @@ export class ConfirmImportModal extends Modal {
 }
 
 /**
- * What's wrong with the title rules, one sentence per bad line, or nothing if
- * every line reads. Bad lines are skipped when the rules run, so this is the
- * only place they show up.
+ * What's wrong with a set of title rules, one sentence per bad line, or
+ * nothing if every line reads. Bad lines are skipped when the rules run, so
+ * this is the only place they show up.
  */
-function describeRuleProblems(text: string): string | void {
+function describeRuleProblems(problems: RuleProblem[]): string | void {
   const strings = t().settings.titleRules;
-  const { problems } = parseTitleRules(text);
   if (problems.length === 0) return;
   return problems
     .map((p) =>
@@ -185,6 +184,19 @@ export class NamedLinksSettingTab extends PluginSettingTab {
             },
           },
           {
+            ...s.domainTitleRules,
+            control: {
+              type: 'textarea',
+              key: 'domainTitleRules',
+              defaultValue: DEFAULT_SETTINGS.domainTitleRules,
+              placeholder:
+                'github.com: /^GitHub - / =>\nyoutube.com: (Official Video) =>',
+              rows: 4,
+              validate: (value: string) =>
+                describeRuleProblems(parseDomainTitleRules(value).problems),
+            },
+          },
+          {
             name: s.titleRules.name,
             desc: s.titleRules.desc,
             control: {
@@ -193,7 +205,8 @@ export class NamedLinksSettingTab extends PluginSettingTab {
               defaultValue: DEFAULT_SETTINGS.titleRules,
               placeholder: '/\\s*\\|\\s*My Site$/ =>\n(Official Video) =>',
               rows: 4,
-              validate: (value: string) => describeRuleProblems(value),
+              validate: (value: string) =>
+                describeRuleProblems(parseTitleRules(value).problems),
             },
           },
           {

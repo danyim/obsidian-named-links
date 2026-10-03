@@ -255,3 +255,36 @@ export function unwrapAutolink(token: string): string {
     ? token.slice(1, -1)
     : token;
 }
+
+function stripWww(host: string): string {
+  return host.startsWith('www.') ? host.slice(4) : host;
+}
+
+/**
+ * The domain an entry such as `example.com`, `*.example.com`,
+ * `https://www.example.com/` or `localhost:3000` names, or null if it isn't
+ * a bare domain (it has a path, spaces, or no dot and isn't localhost).
+ */
+export function domainOf(entry: string): string | null {
+  const bare = entry
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^\*\./, '')
+    .replace(/\/$/, '');
+  if (!/^[a-z0-9.-]+(?::\d+)?$/.test(bare)) return null;
+  if (!bare.includes('.') && !bare.startsWith('localhost')) return null;
+  return stripWww(bare.replace(/:\d+$/, ''));
+}
+
+/**
+ * Whether a URL is on `domain` or one of its subdomains, so `x.com` matches
+ * x.com and www.x.com but not netflix.com. `domain` is what `domainOf`
+ * returns.
+ */
+export function hostMatchesDomain(url: string, domain: string): boolean {
+  const absolute = toAbsoluteUrl(url);
+  if (!absolute) return false;
+  const host = stripWww(new URL(absolute).hostname.toLowerCase());
+  return host === domain || host.endsWith(`.${domain}`);
+}

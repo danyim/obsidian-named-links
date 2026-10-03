@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 
 import {
+  applyDomainTitleRules,
   applyTitleRules,
   cleanupTitle,
   hostLabel,
+  parseDomainTitleRules,
   parseTitleRules,
   removeSiteName,
 } from '../../src/cleanup';
@@ -226,14 +228,119 @@ describe('applyTitleRules', () => {
   });
 });
 
+describe('parseDomainTitleRules', () => {
+  it('reads a domain and a rule per line', () => {
+    const { rules, problems } = parseDomainTitleRules(
+      [
+        '# comment',
+        'github.com: /^GitHub - / =>',
+        '*.substack.com: / \\| .*$/ =>',
+        'https://www.youtube.com/: (Official Video) =>',
+        'localhost:3000: Dev => Local',
+        'example.com: a:b => c',
+      ].join('\n')
+    );
+    assert.deepEqual(problems, []);
+    assert.deepEqual(
+      rules.map((r) => [r.domain, r.rule.pattern.source, r.rule.replacement]),
+      [
+        ['github.com', '^GitHub - ', ''],
+        ['substack.com', ' \\| .*$', ''],
+        ['youtube.com', '\\(Official Video\\)', ''],
+        ['localhost', 'Dev', 'Local'],
+        ['example.com', 'a:b', 'c'],
+      ]
+    );
+  });
+
+  it('reports a line without a domain, and problems in the rule', () => {
+    const { rules, problems } = parseDomainTitleRules(
+      [
+        'Wikipedia => WP',
+        'not a domain: x => y',
+        'github.com: /(/ =>',
+        'x.com: nothing',
+      ].join('\n')
+    );
+    assert.equal(rules.length, 0);
+    assert.deepEqual(
+      problems.map((p) => [p.line, p.kind]),
+      [
+        [1, 'missingDomain'],
+        [2, 'missingDomain'],
+        [3, 'invalidRegex'],
+        [4, 'missingArrow'],
+      ]
+    );
+  });
+});
+
+describe('applyDomainTitleRules', () => {
+  const rules = parseDomainTitleRules(
+    'github.com: /^GitHub - / =>\nx.com: /\\s+on X$/ =>'
+  ).rules;
+
+  it("runs only the rules for the URL's domain and its subdomains", () => {
+    assert.equal(
+      applyDomainTitleRules('GitHub - a/b', 'https://gist.github.com/x', rules),
+      'a/b'
+    );
+    assert.equal(
+      applyDomainTitleRules('Post on X', 'https://x.com/a/status/1', rules),
+      'Post'
+    );
+  });
+
+  it("doesn't run a rule for a domain that merely ends the same way", () => {
+    assert.equal(
+      applyDomainTitleRules('Show on X', 'https://netflix.com/title', rules),
+      'Show on X'
+    );
+  });
+});
+
 describe('cleanupTitle', () => {
+  it('runs the domain rules, then the page rules', () => {
+    assert.equal(
+      cleanupTitle('Draft: Notes', {
+        url: 'https://example.com/a',
+        siteName: null,
+        removeSiteName: false,
+        domainRules: 'example.com: Draft => Final',
+        pageRules: '/^Final: (.*)$/ => $1 (final)',
+      }),
+      'Notes (final)'
+    );
+  });
+
+  it('runs either set alone', () => {
+    const base = {
+      url: 'https://example.com/a',
+      siteName: null,
+      removeSiteName: false,
+    };
+    assert.equal(
+      cleanupTitle('A B', {
+        ...base,
+        domainRules: 'example.com: A => Z',
+        pageRules: '',
+      }),
+      'Z B'
+    );
+    assert.equal(
+      cleanupTitle('A B', { ...base, domainRules: '', pageRules: 'B => Y' }),
+      'A Y'
+    );
+  });
+
   it('removes the site name before the rules run', () => {
     assert.equal(
       cleanupTitle('  [Draft]  Notes - YouTube ', {
         url: 'https://youtube.com/watch?v=1',
         siteName: null,
         removeSiteName: true,
-        rules: '/^\\[Draft\\] / =>',
+        domainRules: '',
+        pageRules: '/^\\[Draft\\] / =>',
       }),
       'Notes'
     );
@@ -245,7 +352,8 @@ describe('cleanupTitle', () => {
         url: 'https://youtube.com',
         siteName: null,
         removeSiteName: false,
-        rules: '',
+        domainRules: '',
+        pageRules: '',
       }),
       'Video - YouTube'
     );

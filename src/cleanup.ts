@@ -4,7 +4,7 @@
  * #84, #115, #151). No Obsidian imports, so the unit tests run it directly.
  */
 import { cleanTitle } from './title';
-import { toAbsoluteUrl } from './url';
+import { domainOf, hostMatchesDomain, toAbsoluteUrl } from './url';
 
 // Separators sites put between a page's name and their own: a bar, a hyphen,
 // an en dash, an em dash, a middle dot, a bullet, a double colon and a
@@ -186,10 +186,11 @@ export interface TitleRule {
 export type RuleProblem =
   | { line: number; kind: 'missingArrow' }
   | { line: number; kind: 'emptyPattern' }
-  | { line: number; kind: 'invalidRegex'; message: string };
+  | { line: number; kind: 'invalidRegex'; message: string }
+  | { line: number; kind: 'missingDomain' };
 
-export interface ParsedRules {
-  rules: TitleRule[];
+export interface ParsedRules<R> {
+  rules: R[];
   /** Lines that couldn't be read as a rule, 1-based. */
   problems: RuleProblem[];
 }
@@ -201,52 +202,85 @@ function escapeRegExp(text: string): string {
 }
 
 /**
- * Reads the find/replace rules setting: one `pattern => replacement` per
- * line. A pattern written `/.../flags` is a regular expression; anything else
- * is literal text, replaced wherever it appears. Spaces around `=>` are
- * ignored, and blank lines and lines starting with `#` are skipped.
+ * Reads one `pattern => replacement` rule. A pattern written `/.../flags` is
+ * a regular expression; anything else is literal text, replaced wherever it
+ * appears. Spaces around `=>` are ignored.
  */
-export function parseTitleRules(text: string): ParsedRules {
-  const rules: TitleRule[] = [];
-  const problems: RuleProblem[] = [];
+function parseRule(line: string, lineNumber: number): TitleRule | RuleProblem {
+  const arrow = line.indexOf('=>');
+  if (arrow < 0) return { line: lineNumber, kind: 'missingArrow' };
+  const source = line.slice(0, arrow).trim();
+  const replacement = line.slice(arrow + 2).trim();
+  if (source === '') return { line: lineNumber, kind: 'emptyPattern' };
 
+  const literal = REGEX_LITERAL.exec(source);
+  if (!literal) {
+    return { pattern: new RegExp(escapeRegExp(source), 'g'), replacement };
+  }
+  try {
+    return { pattern: new RegExp(literal[1], literal[2]), replacement };
+  } catch (e) {
+    return {
+      line: lineNumber,
+      kind: 'invalidRegex',
+      message: (e as Error).message,
+    };
+  }
+}
+
+/** Runs `read` over each line that isn't blank or a `#` comment. */
+function parseLines<R>(
+  text: string,
+  read: (line: string, lineNumber: number) => R | RuleProblem
+): ParsedRules<R> {
+  const rules: R[] = [];
+  const problems: RuleProblem[] = [];
   text.split(/\r?\n/).forEach((raw, i) => {
-    const lineNumber = i + 1;
     const line = raw.trim();
     if (line === '' || line.startsWith('#')) return;
-
-    const arrow = line.indexOf('=>');
-    if (arrow < 0) {
-      problems.push({ line: lineNumber, kind: 'missingArrow' });
-      return;
-    }
-    const source = line.slice(0, arrow).trim();
-    const replacement = line.slice(arrow + 2).trim();
-    if (source === '') {
-      problems.push({ line: lineNumber, kind: 'emptyPattern' });
-      return;
-    }
-
-    const literal = REGEX_LITERAL.exec(source);
-    if (!literal) {
-      rules.push({
-        pattern: new RegExp(escapeRegExp(source), 'g'),
-        replacement,
-      });
-      return;
-    }
-    try {
-      rules.push({ pattern: new RegExp(literal[1], literal[2]), replacement });
-    } catch (e) {
-      problems.push({
-        line: lineNumber,
-        kind: 'invalidRegex',
-        message: (e as Error).message,
-      });
-    }
+    const result = read(line, i + 1);
+    if ('kind' in (result as object)) problems.push(result as RuleProblem);
+    else rules.push(result as R);
   });
-
   return { rules, problems };
+}
+
+/**
+ * Reads the page title rules setting: one `pattern => replacement` per line,
+ * applied to every title. Blank lines and lines starting with `#` are
+ * skipped.
+ */
+export function parseTitleRules(text: string): ParsedRules<TitleRule> {
+  return parseLines(text, parseRule);
+}
+
+export interface DomainTitleRule {
+  /** As `domainOf` reads it: matches this host and its subdomains. */
+  domain: string;
+  rule: TitleRule;
+}
+
+// "github.com: pattern => replacement". The domain stops at the first colon
+// that isn't part of a scheme or a port, so a pattern may contain colons of
+// its own. A domain written as a URL is accepted, as in excluded sites.
+const DOMAIN_PREFIX =
+  /^((?:https?:\/\/)?(?:\*\.)?[a-z0-9.-]+(?::\d+)?\/?)\s*:\s*(.*)$/i;
+
+/**
+ * Reads the domain title rules setting: one `domain: pattern => replacement`
+ * per line, applied only to URLs on that domain or its subdomains, matched
+ * the way excluded sites are.
+ */
+export function parseDomainTitleRules(
+  text: string
+): ParsedRules<DomainTitleRule> {
+  return parseLines(text, (line, lineNumber) => {
+    const prefix = DOMAIN_PREFIX.exec(line);
+    const domain = prefix ? domainOf(prefix[1]) : null;
+    if (!prefix || !domain) return { line: lineNumber, kind: 'missingDomain' };
+    const rule = parseRule(prefix[2], lineNumber);
+    return 'kind' in rule ? rule : { domain, rule };
+  });
 }
 
 /**
@@ -256,6 +290,7 @@ export function parseTitleRules(text: string): ParsedRules {
  * kept as it was before them.
  */
 export function applyTitleRules(title: string, rules: TitleRule[]): string {
+  if (rules.length === 0) return title;
   let result = title;
   for (const rule of rules) {
     rule.pattern.lastIndex = 0;
@@ -265,22 +300,42 @@ export function applyTitleRules(title: string, rules: TitleRule[]): string {
   return result === '' ? title : result;
 }
 
+/** Runs the domain rules whose domain the URL is on, in order. */
+export function applyDomainTitleRules(
+  title: string,
+  url: string,
+  rules: DomainTitleRule[]
+): string {
+  return applyTitleRules(
+    title,
+    rules.filter((r) => hostMatchesDomain(url, r.domain)).map((r) => r.rule)
+  );
+}
+
 export interface CleanupOptions {
   url: string;
   siteName: string | null;
   removeSiteName: boolean;
-  rules: string;
+  /** `domain: pattern => replacement` lines, run first. */
+  domainRules: string;
+  /** `pattern => replacement` lines for every title, run second. */
+  pageRules: string;
 }
 
 /**
  * Everything the settings ask for between fetching a title and shortening and
- * escaping it: whitespace clean-up, then the site's name, then the rules.
+ * escaping it: whitespace clean-up, then the site's name, then the domain
+ * title rules for the URL's site, then the page title rules.
  */
 export function cleanupTitle(raw: string, options: CleanupOptions): string {
   let title = cleanTitle(raw);
   if (options.removeSiteName) {
     title = removeSiteName(title, options.siteName, options.url);
   }
-  const { rules } = parseTitleRules(options.rules);
-  return rules.length > 0 ? applyTitleRules(title, rules) : title;
+  title = applyDomainTitleRules(
+    title,
+    options.url,
+    parseDomainTitleRules(options.domainRules).rules
+  );
+  return applyTitleRules(title, parseTitleRules(options.pageRules).rules);
 }

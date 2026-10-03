@@ -76,7 +76,8 @@ export default class NamedLinksPlugin extends Plugin {
             url,
             siteName,
             removeSiteName: this.settings.removeSiteName,
-            rules: this.settings.titleRules,
+            domainRules: this.settings.domainTitleRules,
+            pageRules: this.settings.titleRules,
           })
     );
     return Promise.race([lookup, deadline]).finally(() =>

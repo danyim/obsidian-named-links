@@ -77,7 +77,36 @@ describe('Cleaning up titles', function () {
     });
   });
 
-  describe('Title rules', function () {
+  describe('Domain title rules', function () {
+    it("apply only to their own domain's titles", async function () {
+      await setSettings({
+        domainTitleRules:
+          '127.0.0.1: /^\\[Local\\] / =>\nexample.org: story => tale',
+      });
+      const url = siteUrl(base, '[Local] A story');
+      expect(await pasteAndRead(url)).toBe(`[A story](${url})`);
+    });
+
+    it('run before the page title rules', async function () {
+      await setSettings({
+        domainTitleRules: '127.0.0.1: Draft => Final',
+        titleRules: '/^Final: (.*)$/ => $1 (final)',
+      });
+      const url = siteUrl(base, 'Draft: Notes');
+      expect(await pasteAndRead(url)).toBe(`[Notes (final)](${url})`);
+    });
+
+    it('work without any page title rules, and the other way round', async function () {
+      await setSettings({ domainTitleRules: '127.0.0.1: A => Z' });
+      const url = siteUrl(base, 'A B');
+      expect(await pasteAndRead(url)).toBe(`[Z B](${url})`);
+
+      await setSettings({ domainTitleRules: '', titleRules: 'B => Y' });
+      expect(await pasteAndRead(url)).toBe(`[A Y](${url})`);
+    });
+  });
+
+  describe('Page title rules', function () {
     it('applies literal and regex rules in order', async function () {
       await setSettings({
         titleRules:
@@ -121,39 +150,44 @@ describe('Cleaning up titles', function () {
         setting.open();
         setting.openTabById('named-links');
       });
-      await browser.waitUntil(async () => (await rulesRowText()) !== null, {
+      await browser.waitUntil(async () => (await rowText()) !== null, {
         timeout: 10000,
         timeoutMsg: 'title rules row did not render',
       });
     }
 
-    function rulesRowText(): Promise<string | null> {
-      return browser.executeObsidian(({ app }) => {
+    const PAGE_RULES = 'Page title rules';
+    const DOMAIN_RULES = 'Domain title rules';
+
+    function rowText(name = PAGE_RULES): Promise<string | null> {
+      return browser.executeObsidian(({ app }, name) => {
         const el = (app as any).setting.activeTab?.containerEl as
           HTMLElement | undefined;
         const row = Array.from(
           el?.querySelectorAll('.setting-item') ?? []
         ).find(
-          (r) =>
-            r.querySelector('.setting-item-name')?.textContent === 'Title rules'
+          (r) => r.querySelector('.setting-item-name')?.textContent === name
         ) as HTMLElement | undefined;
         return row ? row.innerText : null;
-      });
+      }, name);
     }
 
-    async function typeRules(text: string) {
-      await browser.executeObsidian(({ app }, text) => {
-        const el = (app as any).setting.activeTab.containerEl as HTMLElement;
-        const row = Array.from(el.querySelectorAll('.setting-item')).find(
-          (r) =>
-            r.querySelector('.setting-item-name')?.textContent === 'Title rules'
-        )!;
-        const area = row.querySelector('textarea')!;
-        area.value = text;
-        area.dispatchEvent(new Event('input', { bubbles: true }));
-        area.dispatchEvent(new Event('change', { bubbles: true }));
-        area.blur();
-      }, text);
+    async function typeRules(text: string, name = PAGE_RULES) {
+      await browser.executeObsidian(
+        ({ app }, text, name) => {
+          const el = (app as any).setting.activeTab.containerEl as HTMLElement;
+          const row = Array.from(el.querySelectorAll('.setting-item')).find(
+            (r) => r.querySelector('.setting-item-name')?.textContent === name
+          )!;
+          const area = row.querySelector('textarea')!;
+          area.value = text;
+          area.dispatchEvent(new Event('input', { bubbles: true }));
+          area.dispatchEvent(new Event('change', { bubbles: true }));
+          area.blur();
+        },
+        text,
+        name
+      );
     }
 
     afterEach(async function () {
@@ -166,6 +200,28 @@ describe('Cleaning up titles', function () {
       await browser.waitUntil(
         async () => (await getSettings()).titleRules === 'foo => bar',
         { timeoutMsg: 'title rules did not reach the settings' }
+      );
+    });
+
+    it('saves the domain rules', async function () {
+      await openSettings();
+      await typeRules('github.com: a => b', DOMAIN_RULES);
+      await browser.waitUntil(
+        async () =>
+          (await getSettings()).domainTitleRules === 'github.com: a => b',
+        { timeoutMsg: 'domain title rules did not reach the settings' }
+      );
+    });
+
+    it('says which domain rule has no domain', async function () {
+      await openSettings();
+      await typeRules('github.com: a => b\nWikipedia => WP', DOMAIN_RULES);
+      await browser.waitUntil(
+        async () =>
+          (await rowText(DOMAIN_RULES))?.includes(
+            'Line 2: it needs to start with a domain and a colon'
+          ) ?? false,
+        { timeoutMsg: 'no validation message for the missing domain' }
       );
     });
 
@@ -191,7 +247,7 @@ describe('Cleaning up titles', function () {
       await typeRules('ok => fine\n/(unclosed/ => x');
       await browser.waitUntil(
         async () =>
-          (await rulesRowText())?.includes(
+          (await rowText())?.includes(
             'Line 2: the regular expression is invalid'
           ) ?? false,
         { timeoutMsg: 'no validation message for the bad regex' }

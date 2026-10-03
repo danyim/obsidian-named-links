@@ -28,7 +28,9 @@ const GAP = 20;
  */
 const SHOWN_SETTINGS: Partial<NamedLinksSettings> = {
   removeSiteName: true,
-  titleRules: '(Official Video) =>\n/\\s+on X$/ =>',
+  domainTitleRules:
+    'github.com: /^GitHub - / =>\nyoutube.com: (Official Video) =>',
+  titleRules: '/\\s+on X$/ =>',
   excludedSites: 'localhost',
 };
 

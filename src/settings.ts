@@ -1,5 +1,5 @@
 /** The settings shape, defaults, and the rules that read them. */
-import { toAbsoluteUrl } from './url';
+import { domainOf, hostMatchesDomain, toAbsoluteUrl } from './url';
 
 /** What an excluded site's URL becomes when pasted. */
 export type ExcludedSiteFormat = 'url' | 'domain';
@@ -19,6 +19,8 @@ export interface NamedLinksSettings {
   removeSiteName: boolean;
   /** Find/replace rules for titles, one `pattern => replacement` per line. */
   titleRules: string;
+  /** `domain: pattern => replacement` rules, run before `titleRules`. */
+  domainTitleRules: string;
   /** Look X posts up through FxTwitter, a third-party service. */
   twitterProxy: boolean;
   /** Sites never fetched, one per line or comma separated. */
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: NamedLinksSettings = {
   maxTitleLength: 0,
   removeSiteName: false,
   titleRules: '',
+  domainTitleRules: '',
   twitterProxy: false,
   excludedSites: '',
   excludedSiteFormat: 'url',
@@ -64,10 +67,6 @@ export function parseExcludedSites(text: string): string[] {
     .filter((s) => s !== '');
 }
 
-function stripWww(host: string): string {
-  return host.startsWith('www.') ? host.slice(4) : host;
-}
-
 /**
  * Whether a URL matches any excluded-site entry.
  *
@@ -79,21 +78,13 @@ function stripWww(host: string): string {
 export function isExcluded(url: string, entries: string[]): boolean {
   const absolute = toAbsoluteUrl(url);
   if (!absolute) return false;
-  const parsed = new URL(absolute);
-  const host = stripWww(parsed.hostname.toLowerCase());
   const lowerUrl = absolute.toLowerCase();
 
   return entries.some((raw) => {
-    const entry = raw.replace(/^https?:\/\//, '').replace(/^\*\./, '');
-    const bare = entry.replace(/\/$/, '');
-    const isDomain =
-      /^[a-z0-9.-]+(?::\d+)?$/.test(bare) &&
-      (bare.includes('.') || bare.startsWith('localhost'));
-    if (isDomain) {
-      const domain = stripWww(bare.replace(/:\d+$/, ''));
-      return host === domain || host.endsWith(`.${domain}`);
-    }
-    return lowerUrl.includes(raw);
+    const domain = domainOf(raw);
+    return domain !== null
+      ? hostMatchesDomain(absolute, domain)
+      : lowerUrl.includes(raw);
   });
 }
 
