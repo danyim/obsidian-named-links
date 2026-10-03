@@ -4,6 +4,7 @@ import {
   HttpRequest,
   HttpResponse,
   decodeHtml,
+  extractSiteName,
   extractTitle,
   fetchTitle,
   twitterProxyUrl,
@@ -93,6 +94,24 @@ describe('extractTitle', () => {
       ),
       'Someone (@someone)'
     );
+  });
+});
+
+describe('extractSiteName', () => {
+  it('reads og:site_name, then application-name', () => {
+    assert.equal(
+      extractSiteName(
+        '<head><meta property="og:site_name" content="The Site"><meta name="application-name" content="App"></head>'
+      ),
+      'The Site'
+    );
+    assert.equal(
+      extractSiteName(
+        '<head><meta name="application-name" content="App"></head>'
+      ),
+      'App'
+    );
+    assert.equal(extractSiteName(page('x')), null);
   });
 });
 
@@ -222,6 +241,32 @@ describe('fetchTitle', () => {
     );
     assert.equal(requests.length, 1);
     assert.match(requests[0].url, /url=https%3A%2F%2Fyoutu\.be%2FdQw4w9WgXcQ/);
+  });
+
+  it("reports the page's declared site name", async () => {
+    const { http } = fakeHttp(() => ({
+      html: '<head><title>A - Site</title><meta property="og:site_name" content="Site"></head>',
+    }));
+    const names: string[] = [];
+    const title = await fetchTitle('https://example.com', {
+      http,
+      onSiteName: (name) => names.push(name),
+    });
+    assert.equal(title, 'A - Site');
+    assert.deepEqual(names, ['Site']);
+  });
+
+  it("reports an oEmbed provider's name", async () => {
+    const { http } = fakeHttp(() => ({
+      headers: { 'content-type': 'application/json' },
+      html: JSON.stringify({ title: 'A video', provider_name: 'YouTube' }),
+    }));
+    const names: string[] = [];
+    await fetchTitle('https://youtu.be/x', {
+      http,
+      onSiteName: (name) => names.push(name),
+    });
+    assert.deepEqual(names, ['YouTube']);
   });
 
   it('falls back to the page when oEmbed fails', async () => {

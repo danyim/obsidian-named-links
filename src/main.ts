@@ -8,6 +8,7 @@ import {
   getLanguage,
 } from 'obsidian';
 
+import { cleanupTitle } from './cleanup';
 import { obsidianHttpClient } from './http';
 import { t } from './lang';
 import { Linker } from './linker';
@@ -60,11 +61,24 @@ export default class NamedLinksPlugin extends Plugin {
     const deadline = new Promise<null>((resolve) => {
       timer = window.setTimeout(() => resolve(null), this.requestTimeoutMs);
     });
+    let siteName: string | null = null;
     const lookup = fetchTitle(url, {
       http: obsidianHttpClient(this.requestTimeoutMs),
       language: getLanguage(),
       twitterProxy: this.settings.twitterProxy,
-    });
+      onSiteName: (name) => {
+        siteName = name;
+      },
+    }).then((title) =>
+      title === null
+        ? null
+        : cleanupTitle(title, {
+            url,
+            siteName,
+            removeSiteName: this.settings.removeSiteName,
+            rules: this.settings.titleRules,
+          })
+    );
     return Promise.race([lookup, deadline]).finally(() =>
       window.clearTimeout(timer)
     );

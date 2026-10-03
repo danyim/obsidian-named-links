@@ -15,6 +15,10 @@ export interface NamedLinksSettings {
   skipCodeAndFrontmatter: boolean;
   /** Characters to keep of a fetched title; 0 keeps all of it. */
   maxTitleLength: number;
+  /** Drop the site's name from the start or end of a title. */
+  removeSiteName: boolean;
+  /** Find/replace rules for titles, one `pattern => replacement` per line. */
+  titleRules: string;
   /** Look X posts up through FxTwitter, a third-party service. */
   twitterProxy: boolean;
   /** Sites never fetched, one per line or comma separated. */
@@ -28,6 +32,8 @@ export const DEFAULT_SETTINGS: NamedLinksSettings = {
   useSelectionAsTitle: false,
   skipCodeAndFrontmatter: true,
   maxTitleLength: 0,
+  removeSiteName: false,
+  titleRules: '',
   twitterProxy: false,
   excludedSites: '',
   excludedSiteFormat: 'url',

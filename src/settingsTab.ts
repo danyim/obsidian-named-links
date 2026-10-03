@@ -7,6 +7,7 @@ import {
   SettingDefinitionItem,
 } from 'obsidian';
 
+import { parseTitleRules } from './cleanup';
 import { t } from './lang';
 import type NamedLinksPlugin from './main';
 import {
@@ -45,6 +46,27 @@ export class ConfirmImportModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
   }
+}
+
+/**
+ * What's wrong with the title rules, one sentence per bad line, or nothing if
+ * every line reads. Bad lines are skipped when the rules run, so this is the
+ * only place they show up.
+ */
+function describeRuleProblems(text: string): string | void {
+  const strings = t().settings.titleRules;
+  const { problems } = parseTitleRules(text);
+  if (problems.length === 0) return;
+  return problems
+    .map((p) =>
+      strings.problem(
+        p.line,
+        p.kind === 'invalidRegex'
+          ? strings.invalidRegex(p.message)
+          : strings[p.kind]
+      )
+    )
+    .join(' ');
 }
 
 export class NamedLinksSettingTab extends PluginSettingTab {
@@ -154,6 +176,26 @@ export class NamedLinksSettingTab extends PluginSettingTab {
         type: 'group',
         heading: s.titlesHeading,
         items: [
+          {
+            ...s.removeSiteName,
+            control: {
+              type: 'toggle',
+              key: 'removeSiteName',
+              defaultValue: DEFAULT_SETTINGS.removeSiteName,
+            },
+          },
+          {
+            name: s.titleRules.name,
+            desc: s.titleRules.desc,
+            control: {
+              type: 'textarea',
+              key: 'titleRules',
+              defaultValue: DEFAULT_SETTINGS.titleRules,
+              placeholder: '/\\s*\\|\\s*My Site$/ =>\n(Official Video) =>',
+              rows: 4,
+              validate: (value: string) => describeRuleProblems(value),
+            },
+          },
           {
             ...s.maxTitleLength,
             control: {

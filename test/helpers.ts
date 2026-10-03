@@ -199,6 +199,8 @@ export async function resetPlugin(): Promise<void> {
       useSelectionAsTitle: false,
       skipCodeAndFrontmatter: true,
       maxTitleLength: 0,
+      removeSiteName: false,
+      titleRules: '',
       twitterProxy: false,
       excludedSites: '',
       excludedSiteFormat: 'url',

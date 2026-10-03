@@ -51,6 +51,8 @@ describe('Settings tab', function () {
       'Use the selection as the title',
       'Skip code and frontmatter',
       'Maximum title length',
+      'Remove the site name',
+      'Title rules',
       'Fetch X posts through FxTwitter',
       'Excluded sites',
       'Paste excluded sites as',
@@ -88,7 +90,11 @@ describe('Settings tab', function () {
     await openSettings();
     await browser.executeObsidian(({ app }) => {
       const el = (app as any).setting.activeTab.containerEl as HTMLElement;
-      const area = el.querySelector('textarea') as HTMLTextAreaElement;
+      // By its row, since the tab has more than one textarea.
+      const row = Array.from(el.querySelectorAll('.setting-item')).find(
+        (r) => r.querySelector('.setting-item-name')?.textContent === 'Sites'
+      )!;
+      const area = row.querySelector('textarea')!;
       area.value = 'example.com\nlocalhost';
       area.dispatchEvent(new Event('input', { bubbles: true }));
       area.dispatchEvent(new Event('change', { bubbles: true }));

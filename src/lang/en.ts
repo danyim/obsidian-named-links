@@ -51,6 +51,19 @@ const en = {
       desc: 'Leave URLs pasted into code blocks, inline code or frontmatter as they are.',
     },
     titlesHeading: 'Titles',
+    removeSiteName: {
+      name: 'Remove the site name',
+      desc: 'Drop the name of the site from the start or end of a title, as in "Video - YouTube" or "GitHub - owner/repo".',
+    },
+    titleRules: {
+      name: 'Title rules',
+      desc: 'Find and replace in every fetched title, one rule per line, written as pattern => replacement. Write the pattern as /pattern/flags for a regular expression, whose replacement can use $1. Lines starting with # are skipped.',
+      problem: (line: number, reason: string) => `Line ${line}: ${reason}`,
+      missingArrow: 'there is no => between the pattern and the replacement.',
+      emptyPattern: 'the pattern is empty.',
+      invalidRegex: (message: string) =>
+        `the regular expression is invalid (${message}).`,
+    },
     maxTitleLength: {
       name: 'Maximum title length',
       desc: 'Shorten longer titles to this many characters. 0 keeps the whole title.',

@@ -34,6 +34,12 @@ export interface FetchTitleOptions {
   language?: string;
   /** Look X posts up through FxTwitter instead of x.com. */
   twitterProxy?: boolean;
+  /**
+   * Told the site's name when the page or oEmbed response declares one, for
+   * removing it from the title. A callback so the title's own return type,
+   * and everything that passes it along, stays a string.
+   */
+  onSiteName?: (siteName: string) => void;
 }
 
 // Some sites refuse requests that don't look like a browser (upstream #171).
@@ -200,6 +206,21 @@ export function extractTitle(
   );
 }
 
+/**
+ * The site's own name as the page declares it: Open Graph's `og:site_name`,
+ * else the `application-name` meta tag.
+ */
+export function extractSiteName(html: string): string | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const meta = (selector: string) =>
+    doc.querySelector(selector)?.getAttribute('content');
+  return (
+    usable(meta('meta[property="og:site_name"]')) ??
+    usable(meta('meta[name="og:site_name"]')) ??
+    usable(meta('meta[name="application-name"]'))
+  );
+}
+
 async function tryRequest(
   http: HttpClient,
   request: HttpRequest
@@ -229,8 +250,15 @@ async function oEmbedTitle(
   try {
     const data = JSON.parse(new TextDecoder('utf-8').decode(res.body())) as {
       title?: unknown;
+      provider_name?: unknown;
     };
-    return typeof data.title === 'string' ? usable(data.title) : null;
+    const title = typeof data.title === 'string' ? usable(data.title) : null;
+    const provider =
+      typeof data.provider_name === 'string'
+        ? usable(data.provider_name)
+        : null;
+    if (title && provider) options.onSiteName?.(provider);
+    return title;
   } catch {
     return null;
   }
@@ -299,5 +327,10 @@ export async function fetchTitle(
     return fileNameFromUrl(absolute) ?? hostnameOf(absolute);
   }
 
-  return extractTitle(decodeHtml(res.body(), contentType));
+  const html = decodeHtml(res.body(), contentType);
+  if (options.onSiteName) {
+    const siteName = extractSiteName(html);
+    if (siteName) options.onSiteName(siteName);
+  }
+  return extractTitle(html);
 }
