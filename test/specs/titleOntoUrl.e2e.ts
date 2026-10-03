@@ -123,6 +123,20 @@ describe('Pasting text onto a selected URL (#7)', function () {
       expect(await editorValue()).toBe('run `My page`');
     });
 
+    // The selection takes in the line break after the opener, so it starts
+    // outside the block; the URL it holds is still inside.
+    it('when the selection starts on a frontmatter opener', async function () {
+      await openNote(`---«\n${url}»\n---\nbody`, { source: true });
+      await pasteText('My page');
+      expect(await editorValue()).toBe('---My page\n---\nbody');
+    });
+
+    it('when the selection starts on a code fence opener', async function () {
+      await openNote(`~~~«\n${url}»\n~~~`, { source: true });
+      await pasteText('My page');
+      expect(await editorValue()).toBe('~~~My page\n~~~');
+    });
+
     it("when the link format doesn't show a title", async function () {
       await setSettings({
         linkFormat: 'custom',
