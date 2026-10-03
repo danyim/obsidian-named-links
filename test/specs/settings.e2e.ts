@@ -51,6 +51,9 @@ describe('Settings tab', function () {
       'Use the selection as the title',
       'Skip code and frontmatter',
       'Maximum title length',
+      'Remove the site name',
+      'Domain title rules',
+      'Page title rules',
       'Fetch X posts through FxTwitter',
       'Excluded sites',
       'Paste excluded sites as',
@@ -75,20 +78,25 @@ describe('Settings tab', function () {
       (row.querySelector('.checkbox-container') as HTMLElement).click();
     });
     await browser.waitUntil(
-      async () => (await getSettings()).useSelectionAsTitle === true,
+      // On by default, so the click turns it off.
+      async () => (await getSettings()).useSelectionAsTitle === false,
       { timeoutMsg: 'toggle did not reach the settings' }
     );
     const saved = await browser.executeObsidian(({ app }) =>
       (app as any).plugins.plugins['named-links'].loadData()
     );
-    expect(saved.useSelectionAsTitle).toBe(true);
+    expect(saved.useSelectionAsTitle).toBe(false);
   });
 
   it('saves the excluded sites text', async function () {
     await openSettings();
     await browser.executeObsidian(({ app }) => {
       const el = (app as any).setting.activeTab.containerEl as HTMLElement;
-      const area = el.querySelector('textarea') as HTMLTextAreaElement;
+      // By its row, since the tab has more than one textarea.
+      const row = Array.from(el.querySelectorAll('.setting-item')).find(
+        (r) => r.querySelector('.setting-item-name')?.textContent === 'Sites'
+      )!;
+      const area = row.querySelector('textarea')!;
       area.value = 'example.com\nlocalhost';
       area.dispatchEvent(new Event('input', { bubbles: true }));
       area.dispatchEvent(new Event('change', { bubbles: true }));

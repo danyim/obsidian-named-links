@@ -72,6 +72,14 @@ export default tseslint.config(
       'obsidianmd/no-nodejs-modules': 'off',
       'obsidianmd/no-global-this': 'off',
       'obsidianmd/prefer-window-timers': 'off',
+      // The screenshot capture restyles the settings pane to frame the image
+      // and composes it on a throwaway canvas: not shipped plugin code, so
+      // the theming and element-creation rules don't apply.
+      'obsidianmd/no-static-styles-assignment': 'off',
+      'obsidianmd/prefer-create-el': 'off',
+      // It also injects a <style> into the window it captures, to hide what
+      // floats over the settings pane; the plugin itself ships styles.css.
+      'obsidianmd/no-forbidden-elements': 'off',
     },
   },
   {

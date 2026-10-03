@@ -7,6 +7,7 @@ import {
   paste,
   resetPlugin,
   runCommand,
+  setSettings,
   settled,
 } from '../helpers';
 import { fixtureBase, stopFixtureServer } from '../server';
@@ -104,6 +105,9 @@ describe('Undoing a titled paste', function () {
   });
 
   it('restores the selection the paste replaced', async function () {
+    // Off, so the paste replaces the selection with the fetched title rather
+    // than linking the selected text.
+    await setSettings({ useSelectionAsTitle: false });
     const url = `${base}/slow?ms=800&title=Replaced`;
     await openNote('see «this» now');
     await paste(url);

@@ -34,3 +34,6 @@ obsidian-versions-lock.txt
 
 # Obsidian Insiders credentials for beta testing
 .env
+
+# Temporary slices written while capturing README screenshots
+screenshots/.tmp-*

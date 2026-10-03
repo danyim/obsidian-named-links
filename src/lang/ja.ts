@@ -55,6 +55,25 @@ const ja: Strings = {
       desc: 'コードブロック、インラインコード、フロントマター内に貼り付けたURLはそのままにする',
     },
     titlesHeading: 'タイトル',
+    removeSiteName: {
+      name: 'サイト名を除去',
+      desc: '「Video - YouTube」や「GitHub - owner/repo」のように、タイトルの先頭または末尾にあるサイト名を取り除く。',
+    },
+    domainTitleRules: {
+      name: 'ドメインごとのタイトル置換ルール',
+      desc: '特定のサイトのタイトルに検索と置換を適用します。ページのタイトル置換ルールより先に適用されます。1行に1つ、「ドメイン: パターン => 置換後」の形式で書きます。ドメインはサブドメインも対象になり、パターンと置換後の書き方はページのタイトル置換ルールと同じです。',
+    },
+    titleRules: {
+      name: 'ページのタイトル置換ルール',
+      desc: '取得したすべてのタイトルに検索と置換を適用します。ドメインごとのルールの後に適用されます。1行に1つ、「パターン => 置換後」の形式で書きます。/パターン/フラグ と書くと正規表現になり、置換後で $1 を使えます。# で始まる行は無視されます。',
+      problem: (line: number, reason: string) => `${line}行目: ${reason}`,
+      missingArrow: 'パターンと置換後の間に => がありません。',
+      emptyPattern: 'パターンが空です。',
+      missingDomain:
+        '「example.com: パターン => 置換後」のように、行の先頭にドメインとコロンが必要です。',
+      invalidRegex: (message: string) =>
+        `正規表現が正しくありません（${message}）。`,
+    },
     maxTitleLength: {
       name: 'タイトルの最大文字数',
       desc: 'これより長いタイトルを短くします。0で無効化。',

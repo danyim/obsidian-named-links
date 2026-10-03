@@ -39,6 +39,18 @@ function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     case '/page':
       // ?title=... sets the title, so a spec can use a distinct one per URL.
       return html(page(url.searchParams.get('title') ?? 'Fixture page'));
+    case '/site': {
+      // A page that declares its site's name, for removing it from the
+      // title: ?title=... and ?site=..., the latter left out if not given.
+      const title = url.searchParams.get('title') ?? 'Fixture page';
+      const site = url.searchParams.get('site');
+      const meta = site
+        ? `<meta property="og:site_name" content="${site}">`
+        : '';
+      return html(
+        `<!doctype html><html><head><meta charset="utf-8">${meta}<title>${title}</title></head></html>`
+      );
+    }
     case '/markdown':
       return html(page('A *bold* [claim] | with `code` &amp; $5'));
     case '/multiline':

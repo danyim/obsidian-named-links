@@ -196,9 +196,12 @@ export async function resetPlugin(): Promise<void> {
     p.settings = {
       enhancePaste: true,
       enhanceDrop: true,
-      useSelectionAsTitle: false,
+      useSelectionAsTitle: true,
       skipCodeAndFrontmatter: true,
       maxTitleLength: 0,
+      removeSiteName: false,
+      titleRules: '',
+      domainTitleRules: '',
       twitterProxy: false,
       excludedSites: '',
       excludedSiteFormat: 'url',
