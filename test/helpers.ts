@@ -197,6 +197,7 @@ export async function resetPlugin(): Promise<void> {
       enhancePaste: true,
       enhanceDrop: true,
       useSelectionAsTitle: true,
+      pasteTitleOntoUrl: false,
       skipCodeAndFrontmatter: true,
       maxTitleLength: 0,
       removeSiteName: false,

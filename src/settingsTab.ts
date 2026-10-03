@@ -178,6 +178,14 @@ export class NamedLinksSettingTab extends PluginSettingTab {
             },
           },
           {
+            ...s.pasteTitleOntoUrl,
+            control: {
+              type: 'toggle',
+              key: 'pasteTitleOntoUrl',
+              defaultValue: DEFAULT_SETTINGS.pasteTitleOntoUrl,
+            },
+          },
+          {
             ...s.skipCodeAndFrontmatter,
             control: {
               type: 'toggle',

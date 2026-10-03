@@ -288,3 +288,53 @@ export function hostMatchesDomain(url: string, domain: string): boolean {
   const host = stripWww(new URL(absolute).hostname.toLowerCase());
   return host === domain || host.endsWith(`.${domain}`);
 }
+
+export interface TitleOntoUrl {
+  /** The URL the pasted text becomes the title of. */
+  url: string;
+  /** The pasted text, trimmed. */
+  title: string;
+  /** Whitespace selected around the URL, kept where it was. */
+  before: string;
+  after: string;
+}
+
+/**
+ * Whether pasting `clipboard` over `selection` should make the pasted text
+ * the title of the selected URL (issue #7): the selection is one URL, bare
+ * or a `<url>` autolink, or one whole `[text](url)` link, and the clipboard
+ * is a single line of text that isn't itself a URL. Anything else is an
+ * ordinary paste, including a URL pasted over a URL.
+ */
+export function titleOntoUrl(
+  selection: string,
+  clipboard: string
+): TitleOntoUrl | null {
+  const title = clipboard.trim();
+  if (title === '' || /[\r\n]/.test(title)) return null;
+  const tokens = title.split(/\s+/);
+  if (tokens.every((t) => toAbsoluteUrl(unwrapAutolink(t)) !== null)) {
+    return null;
+  }
+
+  const core = selection.trim();
+  if (core === '') return null;
+  const before = selection.slice(0, selection.indexOf(core));
+  const after = selection.slice(before.length + core.length);
+
+  const bare = toAbsoluteUrl(unwrapAutolink(core));
+  if (bare) return { url: bare, title, before, after };
+
+  const links = findLinks(core);
+  const [link] = links;
+  if (
+    links.length === 1 &&
+    link.text !== undefined &&
+    link.start === 0 &&
+    link.end === core.length
+  ) {
+    const url = toAbsoluteUrl(link.url);
+    if (url) return { url, title, before, after };
+  }
+  return null;
+}

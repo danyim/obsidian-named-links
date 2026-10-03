@@ -97,9 +97,20 @@ export default class NamedLinksPlugin extends Plugin {
         // The chord marks one paste as plain, not every paste after it.
         const plain = Date.now() < this.plainPasteUntil;
         this.plainPasteUntil = 0;
-        if (plain || !this.settings.enhancePaste) return;
+        if (plain) return;
 
         const text = evt.clipboardData?.getData('text/plain') ?? '';
+        // Its own setting rather than part of titling pasted URLs: nothing
+        // is fetched, and the pasted text isn't a URL.
+        if (
+          this.settings.pasteTitleOntoUrl &&
+          this.linker.pasteTitleOntoUrl(editor, text)
+        ) {
+          evt.preventDefault();
+          return;
+        }
+
+        if (!this.settings.enhancePaste) return;
         const plan = this.planInsert(editor, text);
         if (!plan) return;
 

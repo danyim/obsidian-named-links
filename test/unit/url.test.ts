@@ -8,6 +8,7 @@ import {
   isUrl,
   linkAt,
   linkDestination,
+  titleOntoUrl,
   toAbsoluteUrl,
   unwrapAutolink,
 } from '../../src/url';
@@ -236,5 +237,60 @@ describe('unwrapAutolink', () => {
   it('leaves other text alone', () => {
     assert.equal(unwrapAutolink('https://example.com'), 'https://example.com');
     assert.equal(unwrapAutolink('<>'), '<>');
+  });
+});
+
+describe('titleOntoUrl', () => {
+  const url = 'https://example.com/a';
+
+  it('takes a bare URL selection and a line of text (issue #7)', () => {
+    assert.deepEqual(titleOntoUrl(url, 'My page'), {
+      url,
+      title: 'My page',
+      before: '',
+      after: '',
+    });
+  });
+
+  it('takes an autolink and a whole markdown link', () => {
+    assert.equal(titleOntoUrl(`<${url}>`, 'T')?.url, url);
+    assert.equal(titleOntoUrl(`[old title](${url})`, 'New')?.url, url);
+    assert.equal(titleOntoUrl(`[old](<${url}>)`, 'New')?.url, url);
+  });
+
+  it('keeps whitespace selected around the URL', () => {
+    const result = titleOntoUrl(` ${url}\n`, 'T');
+    assert.equal(result?.before, ' ');
+    assert.equal(result?.after, '\n');
+  });
+
+  it('trims the pasted text and makes a www. URL absolute', () => {
+    assert.deepEqual(titleOntoUrl('www.example.com', '  Spaced  \n'), {
+      url: 'https://www.example.com',
+      title: 'Spaced',
+      before: '',
+      after: '',
+    });
+  });
+
+  it('leaves a URL pasted over a URL to the ordinary paste', () => {
+    assert.equal(titleOntoUrl(url, 'https://other.example.com'), null);
+    assert.equal(titleOntoUrl(url, 'https://a.com https://b.com'), null);
+    assert.equal(titleOntoUrl(url, '<https://other.example.com>'), null);
+  });
+
+  it('refuses empty or multi-line text', () => {
+    assert.equal(titleOntoUrl(url, ''), null);
+    assert.equal(titleOntoUrl(url, '   '), null);
+    assert.equal(titleOntoUrl(url, 'one\ntwo'), null);
+  });
+
+  it('refuses a selection that is more than a URL', () => {
+    assert.equal(titleOntoUrl(`see ${url}`, 'T'), null);
+    assert.equal(titleOntoUrl(`${url} ${url}`, 'T'), null);
+    assert.equal(titleOntoUrl(`[a](${url}) and more`, 'T'), null);
+    assert.equal(titleOntoUrl(`![img](${url})`, 'T'), null);
+    assert.equal(titleOntoUrl('just words', 'T'), null);
+    assert.equal(titleOntoUrl('', 'T'), null);
   });
 });
