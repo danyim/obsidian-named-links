@@ -41,6 +41,12 @@ Titles are cleaned up before they go in: line breaks become spaces, and characte
 
 ## Settings
 
+![The Named Links settings tab in full, in light and dark mode: when to fetch titles, the title clean-up and length settings, the FxTwitter option, and excluded sites](screenshots/settings.png)
+
+On a phone the same settings stack into one column:
+
+<img src="screenshots/settings-mobile.png" alt="The Named Links settings tab on a phone, in light and dark mode" width="384">
+
 | Setting | Default | |
 | --- | --- | --- |
 | Title pasted URLs | On | Fetch the title when a URL is pasted with the normal paste command. |

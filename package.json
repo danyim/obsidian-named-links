@@ -16,6 +16,8 @@
     "test:unit": "mocha --import=tsx \"test/unit/**/*.test.ts\"",
     "pretest:e2e": "npm run build",
     "test:e2e": "scripts/xvfb-wm.sh wdio run ./config/wdio.conf.mts",
+    "prescreenshots": "npm run build",
+    "screenshots": "scripts/xvfb-wm.sh wdio run ./config/wdio.screenshots.mts",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
     "postversion": "git push && git push --tags"
   },

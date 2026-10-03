@@ -35,4 +35,26 @@ plugin. Obsidian doesn't pick up a rebuilt `main.js` on its own: use the
 [Hot Reload](https://github.com/pjeby/hot-reload) plugin, or toggle the plugin
 off and on.
 
+## README screenshots
+
+`npm run screenshots` regenerates the images in `screenshots/` from a real
+Obsidian render, so the README always shows what the current code produces.
+It runs `config/wdio.screenshots.mts` against the latest Obsidian on desktop
+and on the emulated phone UI, with the settings in `test/capture/readme.capture.ts`
+filled in to show the title clean-up in use.
+
+Each image is the whole settings tab, scrolled and stitched together one
+window at a time, in light mode on the left and dark mode on the right. The
+two halves meet at a seam whose gutter takes each half's own background
+color. Like the tests, it needs a display (handled automatically on Linux),
+and it renders in Inter, failing rather than falling back to another
+typeface so the images match between machines:
+
+```bash
+sudo apt-get install fonts-inter
+npm run screenshots
+```
+
+Regenerate them whenever the settings tab changes, and commit the PNGs.
+
 See [TESTING.md](TESTING.md) for running the test suite.
