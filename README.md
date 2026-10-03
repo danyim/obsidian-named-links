@@ -12,6 +12,8 @@ becomes
 [Example Domain](https://example.com)
 ```
 
+![Pasting a URL and getting a titled link](docs/demo.gif)
+
 > [!NOTE]
 > **Named Links is a maintained fork of [Auto Link Title](https://github.com/zolrath/obsidian-auto-link-title) by [@zolrath](https://github.com/zolrath)**, who deserves the credit for the original plugin and its design. That project has seen no activity since [December 2024](https://github.com/zolrath/obsidian-auto-link-title/releases/tag/1.5.5), with dozens of open issues and pull requests.
 >
