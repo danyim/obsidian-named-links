@@ -21,6 +21,7 @@ import { needsTitle, renderLink, templateFor } from './linkFormat';
 import { NamedLinksSettings, isExcluded, parseExcludedSites } from './settings';
 import { readableTitle } from './title';
 import {
+  decodeUrlForDisplay,
   findLinks,
   hostnameOf,
   isImageUrl,
@@ -102,10 +103,15 @@ export class Linker {
     return this.host.settings;
   }
 
-  /** The finished link for a URL, in the format the settings select. */
+  /**
+   * The finished link for a URL, in the format the settings select, with
+   * the URL decoded for reading if the settings ask for it (#6). Every
+   * finished link goes through here; the request and the fallback for a
+   * missing title use the URL as it came.
+   */
   private link(url: string, title: string, titleIsMarkdown = false): string {
     return renderLink(templateFor(this.settings), {
-      url,
+      url: this.settings.decodeUrls ? decodeUrlForDisplay(url) : url,
       title,
       titleIsMarkdown,
     });

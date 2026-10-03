@@ -58,6 +58,8 @@ describe('Settings tab', function () {
       'Fetch X posts through FxTwitter',
       'Excluded sites',
       'Paste excluded sites as',
+      'Link format',
+      'Decode URLs',
     ]) {
       expect(text).toContain(name);
     }

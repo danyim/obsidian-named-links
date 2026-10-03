@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  decodeUrlForDisplay,
   fileNameFromUrl,
   findLinks,
   isFileUrl,
@@ -109,7 +110,106 @@ describe('isFileUrl and fileNameFromUrl', () => {
   });
 });
 
+describe('decodeUrlForDisplay', () => {
+  it('decodes UTF-8 escapes, as in #6', () => {
+    assert.equal(
+      decodeUrlForDisplay('https://jisho.org/word/%E5%AF%BF%E5%8F%B8'),
+      'https://jisho.org/word/寿司'
+    );
+    assert.equal(
+      decodeUrlForDisplay('https://example.com/%F0%9F%98%80'),
+      'https://example.com/😀'
+    );
+  });
+
+  it('decodes lowercase escapes and unreserved ASCII', () => {
+    assert.equal(
+      decodeUrlForDisplay('https://example.com/%e5%af%bf/%41%2D%2E%5F%7E'),
+      'https://example.com/寿/A-._~'
+    );
+  });
+
+  it('decodes a space into a real space', () => {
+    assert.equal(
+      decodeUrlForDisplay('https://en.wikipedia.org/wiki/Blue%20jay'),
+      'https://en.wikipedia.org/wiki/Blue jay'
+    );
+  });
+
+  // Every ASCII character that stays encoded, upper and lower case hex.
+  const kept = '%:/?#[]@!$&\'()*+,;=<>"\\^`{|}';
+  for (const ch of kept) {
+    const hex = ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
+    it(`keeps ${JSON.stringify(ch)} encoded as %${hex}`, () => {
+      for (const escape of [`%${hex}`, `%${hex.toLowerCase()}`]) {
+        const url = `https://example.com/a${escape}b`;
+        assert.equal(decodeUrlForDisplay(url), url);
+      }
+    });
+  }
+
+  it('keeps controls, other whitespace and invisible characters encoded', () => {
+    for (const escape of [
+      '%09', // tab
+      '%0A', // newline
+      '%7F', // delete
+      '%C2%A0', // no-break space
+      '%E2%80%8B', // zero-width space
+      '%E2%80%AE', // right-to-left override
+      '%E3%80%80', // ideographic space
+      '%EF%BB%BF', // byte order mark
+    ]) {
+      const url = `https://example.com/a${escape}b`;
+      assert.equal(decodeUrlForDisplay(url), url, escape);
+    }
+  });
+
+  it('leaves escapes that are not valid UTF-8 as written', () => {
+    for (const url of [
+      'https://example.com/caf%E9', // Latin-1
+      'https://example.com/%E5%AF', // truncated sequence
+      'https://example.com/%C0%AF', // overlong
+      'https://example.com/%80', // lone continuation byte
+    ]) {
+      assert.equal(decodeUrlForDisplay(url), url);
+    }
+  });
+
+  it('decodes the valid parts of a mixed run', () => {
+    assert.equal(
+      decodeUrlForDisplay('https://example.com/%E9%E5%AF%BF%2F%41'),
+      'https://example.com/%E9寿%2FA'
+    );
+  });
+
+  it('decodes in the query and fragment, keeping their delimiters', () => {
+    assert.equal(
+      decodeUrlForDisplay(
+        'https://example.com/s?q=%E5%AF%BF%26x%3D1&lang=ja#%E5%8F%B8'
+      ),
+      'https://example.com/s?q=寿%26x%3D1&lang=ja#司'
+    );
+  });
+
+  it('leaves an already-decoded URL unchanged', () => {
+    for (const url of [
+      'https://jisho.org/word/寿司',
+      'https://example.com/a?b=c#d',
+      'https://xn--r8jz45g.jp/',
+    ]) {
+      assert.equal(decodeUrlForDisplay(url), url);
+    }
+  });
+});
+
 describe('linkDestination', () => {
+  it('wraps a URL with a space in angle brackets', () => {
+    assert.equal(
+      linkDestination('https://en.wikipedia.org/wiki/Blue jay'),
+      '<https://en.wikipedia.org/wiki/Blue jay>'
+    );
+  });
+
   it('leaves balanced parentheses alone', () => {
     const url = 'https://en.wikipedia.org/wiki/Mercury_(planet)';
     assert.equal(linkDestination(url), url);
@@ -216,6 +316,14 @@ describe('findLinks and linkAt', () => {
       findLinks('(https://example.com)')[0]?.url,
       'https://example.com'
     );
+  });
+
+  it('reads a decoded space in a <...> destination back as %20', () => {
+    // Decode URLs writes a URL with a space in the <...> form; the link has
+    // to be found again, e.g. by the enhance command.
+    const link = linkAt('[Word](<https://example.com/Blue jay>)', 2);
+    assert.equal(link?.url, 'https://example.com/Blue%20jay');
+    assert.equal(link?.text, 'Word');
   });
 
   it('finds several URLs in order', () => {
