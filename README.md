@@ -48,6 +48,7 @@ None has a default hotkey; set one under Settings → Hotkeys.
 | Excluded sites | Empty | Never fetched. `example.com` covers its subdomains; other text matches any URL containing it. |
 | Paste excluded sites as | The URL as it is | Or a link titled with the domain. |
 | Link format | Markdown link | See [Link format](#link-format). |
+| Decode URLs | Off | Write `%E5%AF%BF` as `寿`. See [Decoding URLs](#decoding-urls). |
 
 ### Link format
 
@@ -59,6 +60,17 @@ None has a default hotkey; set one under Settings → Hotkeys.
 | Custom | Your own template using `{title}`, `{url}` and `{domain}` |
 
 For example, `[source]({url})` writes `[source](https://example.com)` without fetching anything, and `<a href="{url}" target="_blank">{title}</a>` opens in a new tab. Each value is escaped for where it sits in the template, so a title can't break the link.
+
+### Decoding URLs
+
+With **Decode URLs** on, a finished link's URL is written with its percent-escapes decoded, so it's readable and searchable:
+
+| Pasted | Written as |
+| --- | --- |
+| `https://jisho.org/word/%E5%AF%BF%E5%8F%B8` | `[Title](https://jisho.org/word/寿司)` |
+| `https://en.wikipedia.org/wiki/Blue%20jay` | `[Title](<https://en.wikipedia.org/wiki/Blue jay>)` |
+
+Anything that would change where the URL leads or break the markdown stays encoded (`%`, `/ ? # & =` and the other URL delimiters, quotes, brackets and invisible characters). The title is still fetched from the URL as pasted.
 
 ### Cleaning up titles
 

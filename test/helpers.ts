@@ -208,6 +208,7 @@ export async function resetPlugin(): Promise<void> {
       excludedSiteFormat: 'url',
       linkFormat: 'markdown',
       customLinkFormat: '[{title}]({url})',
+      decodeUrls: false,
     };
     p.requestTimeoutMs = 15000;
     await p.saveSettings();

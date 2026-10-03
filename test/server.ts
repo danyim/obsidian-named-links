@@ -111,6 +111,12 @@ function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         '<html><head><title>FxTwitter</title><meta property="og:title" content="Someone (@someone)"></head></html>'
       );
     default:
+      // Any path under /word/, such as a percent-encoded one, is a page
+      // titled with its last segment decoded, for the URL decoding specs.
+      if (url.pathname.startsWith('/word/')) {
+        const segment = url.pathname.split('/').pop() ?? '';
+        return html(page(`Word ${decodeURIComponent(segment)}`));
+      }
       res.writeHead(404);
       res.end();
   }

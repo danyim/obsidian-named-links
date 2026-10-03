@@ -32,6 +32,8 @@ export interface NamedLinksSettings {
   /** A preset link format, or `custom` for `customLinkFormat`. */
   linkFormat: LinkFormat;
   customLinkFormat: string;
+  /** Write a finished link's URL percent-decoded, for reading. */
+  decodeUrls: boolean;
 }
 
 export const DEFAULT_SETTINGS: NamedLinksSettings = {
@@ -49,6 +51,7 @@ export const DEFAULT_SETTINGS: NamedLinksSettings = {
   excludedSiteFormat: 'url',
   linkFormat: 'markdown',
   customLinkFormat: DEFAULT_TEMPLATE,
+  decodeUrls: false,
 };
 
 /** Merges stored data over the defaults, dropping keys of the wrong type. */

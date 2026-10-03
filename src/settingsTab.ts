@@ -311,6 +311,14 @@ export class NamedLinksSettingTab extends PluginSettingTab {
                 this.templateError(validateTemplate(value)),
             },
           },
+          {
+            ...s.decodeUrls,
+            control: {
+              type: 'toggle',
+              key: 'decodeUrls',
+              defaultValue: DEFAULT_SETTINGS.decodeUrls,
+            },
+          },
         ],
       },
     ];

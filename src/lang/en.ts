@@ -105,6 +105,10 @@ const en = {
       name: 'Custom format',
       desc: 'Use {title}, {url} and {domain}. Leave out {title} and no title is fetched.',
     },
+    decodeUrls: {
+      name: 'Decode URLs',
+      desc: 'Write the link with its URL decoded for reading, so %E5%AF%BF%E5%8F%B8 shows as 寿司 and %20 as a space. Characters that would change where the URL leads stay encoded.',
+    },
     templateErrors: {
       missingUrl: 'The format needs {url}.',
       unknownPlaceholder: (name: string) =>

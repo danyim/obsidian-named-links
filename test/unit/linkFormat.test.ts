@@ -162,6 +162,33 @@ describe('renderLink', () => {
       );
     });
 
+    it('encodes a space in a URL written as text, so the autolink holds', () => {
+      assert.equal(
+        renderLink('{title}: {url}', {
+          title: 'T',
+          url: 'https://example.com/Blue jay',
+        }),
+        'T: https://example.com/Blue%20jay'
+      );
+      assert.equal(
+        renderLink('<{url}>', {
+          title: '',
+          url: 'https://example.com/Blue jay',
+        }),
+        '<https://example.com/Blue%20jay>'
+      );
+    });
+
+    it('wraps a URL with a space in a destination in angle brackets', () => {
+      assert.equal(
+        renderLink('[{title}]({url})', {
+          title: 'Blue jay',
+          url: 'https://en.wikipedia.org/wiki/Blue jay',
+        }),
+        '[Blue jay](<https://en.wikipedia.org/wiki/Blue jay>)'
+      );
+    });
+
     it('leaves an unknown placeholder as written', () => {
       assert.equal(
         renderLink('[{titel}]({url})', {

@@ -258,8 +258,13 @@ function escapeFor(
   switch (piece.context) {
     case 'text':
       // A bare URL in text is autolinked as written. Escaping it would put
-      // the backslashes into the link: Obsidian renders a\_b as a%5C_b.
-      if (name === 'url') return piece.angled ? encodeAngles(value) : value;
+      // the backslashes into the link: Obsidian renders a\_b as a%5C_b. A
+      // space, which a decoded URL can hold, would end the autolink, so it
+      // goes back to %20 here.
+      if (name === 'url') {
+        const bare = value.replace(/ /g, '%20');
+        return piece.angled ? encodeAngles(bare) : bare;
+      }
       return name === 'title' && values.titleIsMarkdown
         ? selectionAsLinkText(value)
         : escapeMarkdown(value);

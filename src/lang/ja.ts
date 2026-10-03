@@ -109,6 +109,10 @@ const ja: Strings = {
       name: 'カスタム形式',
       desc: '{title}、{url}、{domain} が使えます。{title} を含めない場合はタイトルを取得しません。',
     },
+    decodeUrls: {
+      name: 'URLをデコード',
+      desc: 'リンクのURLを読みやすくデコードして書き込みます。%E5%AF%BF%E5%8F%B8 は 寿司、%20 はスペースになります。URLの行き先が変わってしまう文字はエンコードされたまま残します。',
+    },
     templateErrors: {
       missingUrl: '形式には {url} が必要です。',
       unknownPlaceholder: (name: string) =>

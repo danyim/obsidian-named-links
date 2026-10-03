@@ -144,7 +144,8 @@ export function hostnameOf(url: string): string {
 /**
  * Formats a URL as a markdown link destination. Unbalanced or nested
  * parentheses would end the link early, or past what the link parsers here
- * read back, so those URLs use the `<...>` form.
+ * read back, and whitespace (a decoded URL can hold spaces) ends a bare
+ * destination outright, so those URLs use the `<...>` form.
  */
 export function linkDestination(url: string): string {
   let depth = 0;
@@ -153,8 +154,92 @@ export function linkDestination(url: string): string {
     if (ch === '(') deepest = Math.max(deepest, ++depth);
     else if (ch === ')' && --depth < 0) break;
   }
-  const plain = depth === 0 && deepest <= 1 && !/[<>]/.test(url);
+  const plain = depth === 0 && deepest <= 1 && !/[<>\s]/.test(url);
   return plain ? url : `<${url}>`;
+}
+
+// ASCII characters left percent-encoded when decoding a URL for display:
+//
+// - `%`, so decoding never creates an escape that wasn't there.
+// - RFC 3986's reserved characters, `: / ? # [ ] @` and `! $ & ' ( ) * + , ;
+//   =`. Encoded, they are data; decoded, they are delimiters, so decoding
+//   one can change which part of the URL a character belongs to or what the
+//   server receives (an encoded `&` in a query value is not a new parameter).
+// - Characters that would break the markdown or HTML the URL is written
+//   into, or that RFC 1738 calls unsafe: `< > " \ ^ { | }` and the backtick.
+//
+// Controls, whitespace other than a plain space, and invisible formatting
+// characters (bidirectional overrides among them, which can make a URL read
+// as something it isn't) stay encoded too; see `keepsEncoding`.
+const KEEP_ENCODED = new Set('%:/?#[]@!$&\'()*+,;=<>"\\^`{|}'.split(''));
+
+/** Whether a decoded character should be written back as its escapes. */
+function keepsEncoding(ch: string): boolean {
+  if (KEEP_ENCODED.has(ch)) return true;
+  if (ch === ' ') return false;
+  return /[\p{Cc}\p{Cf}\p{Z}]/u.test(ch);
+}
+
+/** How many bytes a UTF-8 sequence starting with `lead` has, or 0 if none. */
+function sequenceLength(lead: number): number {
+  if (lead < 0x80) return 1;
+  if (lead >= 0xc2 && lead <= 0xdf) return 2;
+  if (lead >= 0xe0 && lead <= 0xef) return 3;
+  if (lead >= 0xf0 && lead <= 0xf4) return 4;
+  return 0;
+}
+
+function decodeUtf8(bytes: number[]): string | null {
+  try {
+    // ignoreBOM keeps a byte order mark as U+FEFF; by default the decoder
+    // drops it, and the escape would vanish from the URL.
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
+      Uint8Array.from(bytes)
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A URL with its percent-escapes decoded for reading, as in
+ * `https://jisho.org/word/寿司` for `.../%E5%AF%BF%E5%8F%B8` (#6).
+ *
+ * Only escapes that spell valid UTF-8 are decoded; anything else, such as a
+ * stray `%E5` or a Latin-1 `%E9`, stays as written. Characters for which
+ * `keepsEncoding` holds stay encoded even when valid. A decoded space
+ * becomes a real space, which `linkDestination` then wraps in `<...>`.
+ * Punycode hosts (`xn--`) are left as they are.
+ */
+export function decodeUrlForDisplay(url: string): string {
+  return url.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
+    const escapes = run.split('%').slice(1);
+    const bytes = escapes.map((hex) => parseInt(hex, 16));
+    let out = '';
+    let i = 0;
+    while (i < bytes.length) {
+      const length = sequenceLength(bytes[i]);
+      const ch =
+        length > 0 && i + length <= bytes.length
+          ? decodeUtf8(bytes.slice(i, i + length))
+          : null;
+      if (ch === null) {
+        // Not the start of a valid sequence: keep this one escape and try
+        // again from the next byte.
+        out += `%${escapes[i]}`;
+        i += 1;
+        continue;
+      }
+      out += keepsEncoding(ch)
+        ? escapes
+            .slice(i, i + length)
+            .map((e) => `%${e}`)
+            .join('')
+        : ch;
+      i += length;
+    }
+    return out;
+  });
 }
 
 export interface LinkAtCursor {
