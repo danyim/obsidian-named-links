@@ -23,8 +23,7 @@ becomes
 
 - **Pasting a URL** inserts a `[Fetching title…](url)` placeholder straight away, then swaps in the page title once it arrives. Several URLs pasted at once, one per line or separated by spaces, are each titled.
 - **Dropping a URL** dragged in from a browser or another app does the same, at the spot where you drop it.
-- **Add a title to an existing URL** (a command, so give it a hotkey under Settings → Hotkeys) titles the URL under the cursor. On an existing `[text](url)` link it replaces the text with the fetched title, and a `<URL>` autolink becomes a titled link. With text selected, it titles every bare URL the selection touches, skipping code, frontmatter, and URLs that are already part of a link, image or reference definition.
-- **Paste URL and fetch its title** and **Paste without fetching a title** are commands too, for binding to hotkeys of your own.
+- **URLs already in a note** can be titled with the **Add a title to an existing URL** command. See [Commands](#commands).
 - **Undo** after a title arrives gives back the URL as you pasted it, and undoing again removes the paste. On a link added with **Add a title to an existing URL**, one undo returns it to what it was. If you edit the note while a title is still on its way, the first undo still gives back the URL, but the next one shows the placeholder rather than removing the paste.
 
 The URL is left exactly as pasted when:
@@ -38,6 +37,16 @@ The URL is left exactly as pasted when:
 - no title could be found. A notice says so, and nothing is left behind in the note.
 
 Titles are cleaned up before they go in: line breaks become spaces, and characters that would change how the link renders (`[`, `]`, `|`, `*`, `_`, `` ` ``, `$`, `==`, a `#` that would start a tag, and so on) are escaped. A file such as a PDF is named after its path rather than downloaded.
+
+## Commands
+
+None of the commands has a default hotkey; give them one from Settings → Hotkeys if you use them often.
+
+| Command | What it does |
+| --- | --- |
+| Add a title to an existing URL | Titles the URL under the cursor. On an existing `[text](url)` link it replaces the text with the fetched title, and a `<URL>` autolink becomes a titled link. With text selected, it titles every bare URL the selection touches, skipping code, frontmatter, and URLs that are already part of a link, image or reference definition. |
+| Paste URL and fetch its title | Pastes the clipboard, titling it when it holds one or more URLs, the same way a normal paste does. Works even with **Title pasted URLs** turned off. |
+| Paste without fetching a title | Pastes the clipboard as it is, without fetching anything. |
 
 ## Settings
 
@@ -151,6 +160,24 @@ There is no telemetry and no other network use. Sites you list under **Excluded 
 ## Mobile
 
 Named Links works on Obsidian mobile. Paste with the long-press **Paste** action. Some keyboards' clipboard shortcuts (Gboard's clipboard strip, for one) insert text without a paste event, so the plugin never sees them; use the **Paste URL and fetch its title** command instead.
+
+## How it compares
+
+A few plugins overlap with this one. Here's how they line up, going by what each one's README documents (as of October 2026); a dash means the README doesn't mention it.
+
+| | Named Links | [Auto Link Title](https://github.com/zolrath/obsidian-auto-link-title) | [URL Namer](https://github.com/zfei/obsidian-url-namer) | [Paste URL into selection](https://github.com/denolehov/obsidian-url-into-selection) | [Links](https://github.com/mii-key/obsidian-links) |
+| --- | --- | --- | --- | --- | --- |
+| Titles a URL as you paste it | Yes | Yes | Optional | No | No |
+| Titles URLs already in a note | Command, at the cursor or across a selection | Command, at the cursor | Command, across a selection | No | When converting a URL to a markdown link |
+| Several URLs pasted at once | Each titled | - | - | - | - |
+| URL pasted over selected text links that text | Yes, by default | Optional | - | Yes | Command |
+| Text pasted over a selected URL becomes its title | Yes, by default | - | - | Command | Command |
+| Title clean-up and find/replace rules | Yes | Maximum length only | - | - | - |
+| Link format (HTML, custom templates) | Yes | - | - | - | Converts between link types |
+| How it reads titles | From the page's HTML, without running the page | A hidden browser window that runs the page, by default | From the page's HTML | Doesn't | From the page's HTML |
+| Last updated | October 2026 | December 2024 | April 2026 | August 2025 | March 2026 |
+
+If all you need is turning selected text into a link, Paste URL into selection is lighter. For converting and editing links of every kind, Links does far more. Named Links is for getting a good title on a URL with as little effort as possible.
 
 ## Development
 
