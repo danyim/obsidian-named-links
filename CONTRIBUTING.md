@@ -88,8 +88,9 @@ a real site.
 For maintainers. `npm version <x.y.z>` does the whole bump: it updates
 `package.json`, runs the `version` script to sync `manifest.json` and
 `versions.json`, commits, tags, and (via `postversion`) pushes the branch and
-the tag. The pushed tag triggers the release workflow, which builds the
-plugin, generates artifact attestations, and creates a **draft** GitHub release
+the tag. The pushed tag triggers the release workflow, which checks the tag
+matches `manifest.json`'s version, runs lint, the type check and the unit
+tests, builds the plugin, generates artifact attestations, and creates a **draft** GitHub release
 with the three loose files the community catalog installs from (`main.js`,
 `manifest.json`, `styles.css`) plus `named-links-<version>.zip`, which wraps
 them in a `named-links/` folder for manual installs.

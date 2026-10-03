@@ -135,8 +135,9 @@ npm version <x.y.z>   # bump package.json, sync manifest.json + versions.json,
                       # commit, tag, push branch and tag
 ```
 
-Pushing the tag triggers `.github/workflows/release.yml`, which builds the
-plugin, zips the release files into a `named-links/` folder, attests
+Pushing the tag triggers `.github/workflows/release.yml`, which fails unless
+the tag matches `manifest.json`'s version and lint, the type check and the
+unit tests pass, then builds the plugin, zips the release files into a `named-links/` folder, attests
 provenance for `main.js`, `styles.css` and the zip, and creates a **draft**
 GitHub release that a maintainer reviews and publishes by hand.
 

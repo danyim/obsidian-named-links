@@ -26,10 +26,31 @@ jobs:
           node-version: '24.x'
           cache: 'npm'
 
-      - name: Build plugin
+      - run: npm ci
+
+      # Obsidian installs a version from the release whose tag matches the
+      # manifest's version exactly, so a tag that doesn't would publish a
+      # release no one can install.
+      - name: Check the tag matches manifest.json
         run: |
-          npm ci
-          npm run build
+          tag="${GITHUB_REF#refs/tags/}"
+          version="$(jq -r .version manifest.json)"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $tag doesn't match manifest.json version $version"
+            exit 1
+          fi
+
+      # The fast checks only. The e2e suite needs a display and downloads
+      # Obsidian, and test.yaml already runs it on every push to main, which
+      # is where release tags are cut from.
+      - name: Lint, type-check and unit tests
+        run: |
+          npm run lint
+          npm run check-types
+          npm run test:unit
+
+      - name: Build plugin
+        run: npm run build
 
       # Obsidian's community catalog installs from the three loose files, but
       # a manual install needs them inside a folder named after the plugin id
