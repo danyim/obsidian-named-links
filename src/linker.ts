@@ -383,6 +383,13 @@ export class Linker {
       return;
     }
 
+    // A link format without a title finishes every link here and now, with
+    // nothing pending for the undo history to track.
+    if (pending.length === 0) {
+      editor.transaction({ changes });
+      return;
+    }
+
     // One transaction, so a single undo reverts every URL.
     const links = changes.map((change, i) => ({
       link: change.text,
