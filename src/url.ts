@@ -271,8 +271,15 @@ function trimBareUrl(raw: string): string {
   return url;
 }
 
+/**
+ * A link destination's URL. Only the `<...>` form can hold a space, which
+ * is how a decoded URL with one is written, so a space there is read back
+ * as `%20`: the URL it stood for before decoding, and one `isUrl` accepts.
+ */
 function stripAngles(dest: string): string {
-  return dest.startsWith('<') && dest.endsWith('>') ? dest.slice(1, -1) : dest;
+  return dest.startsWith('<') && dest.endsWith('>')
+    ? dest.slice(1, -1).replace(/ /g, '%20')
+    : dest;
 }
 
 /** Every markdown link and bare URL on a line, in order. */

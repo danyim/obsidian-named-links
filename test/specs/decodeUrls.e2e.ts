@@ -121,6 +121,26 @@ describe('Decoding URLs', function () {
     expect(links).toHaveLength(1);
   });
 
+  it('can retitle a link it wrote with a decoded space', async function () {
+    await setSettings({ decodeUrls: true });
+    const link = `[old](<${base}/word/Blue jay>)`;
+    await openNote(`${link.slice(0, 3)}‸${link.slice(3)}`, { source: true });
+    await runCommand('enhance-url-with-title');
+    await settled();
+    expect(await editorValue()).toBe(
+      `[Word Blue jay](<${base}/word/Blue jay>)`
+    );
+  });
+
+  it('can paste a title onto a link it wrote with a decoded space', async function () {
+    await setSettings({ decodeUrls: true, pasteTitleOntoUrl: true });
+    await openNote(`«[old](<${base}/word/Blue jay>)»`, { source: true });
+    await paste('New title');
+    await settled();
+    expect(await editorValue()).toBe(`[New title](<${base}/word/Blue jay>)`);
+    expect(requestLog()).toEqual([]);
+  });
+
   it('saves the toggle', async function () {
     await browser.executeObsidian(({ app }) => {
       const setting = (app as any).setting;

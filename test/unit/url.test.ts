@@ -318,6 +318,14 @@ describe('findLinks and linkAt', () => {
     );
   });
 
+  it('reads a decoded space in a <...> destination back as %20', () => {
+    // Decode URLs writes a URL with a space in the <...> form; the link has
+    // to be found again, e.g. by the enhance command.
+    const link = linkAt('[Word](<https://example.com/Blue jay>)', 2);
+    assert.equal(link?.url, 'https://example.com/Blue%20jay');
+    assert.equal(link?.text, 'Word');
+  });
+
   it('finds several URLs in order', () => {
     const urls = findLinks('Visit https://example.com and http://test.org').map(
       (l) => l.url
