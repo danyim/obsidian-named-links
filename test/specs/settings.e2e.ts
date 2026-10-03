@@ -49,6 +49,7 @@ describe('Settings tab', function () {
       'Title pasted URLs',
       'Title dropped URLs',
       'Use the selection as the title',
+      'Paste text onto a selected URL as its title',
       'Skip code and frontmatter',
       'Maximum title length',
       'Remove the site name',

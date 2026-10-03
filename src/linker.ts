@@ -26,6 +26,7 @@ import {
   isImageUrl,
   linkAt,
   linkDestination,
+  titleOntoUrl,
   toAbsoluteUrl,
   unwrapAutolink,
 } from './url';
@@ -182,6 +183,28 @@ export class Linker {
     // same, and keeps whatever else it does (undo grouping, the selection).
     if (pending.length === 0 && inserted === text) return null;
     return { text: inserted, pending };
+  }
+
+  /**
+   * Pasting text over a selected URL, or over a whole link, makes that text
+   * the link's title (issue #7): the reverse of using the selection as the
+   * title. Nothing is fetched. Returns whether it took the paste; anything
+   * that doesn't qualify is left to the ordinary paste.
+   */
+  pasteTitleOntoUrl(editor: Editor, clipboard: string): boolean {
+    if (!editor.somethingSelected() || editor.listSelections().length > 1) {
+      return false;
+    }
+    // A link format without the title would throw the pasted text away.
+    if (!this.wantsTitle) return false;
+    if (this.isRawContext(editor, editor.getCursor('from'))) return false;
+    const target = titleOntoUrl(editor.getSelection(), clipboard);
+    if (!target) return false;
+    const text =
+      target.before + this.link(target.url, target.title, true) + target.after;
+    // An undo event of its own, so one undo gives the URL back.
+    if (!insertTracked(editor, text, [])) editor.replaceSelection(text);
+    return true;
   }
 
   /** Inserts a plan at the selection and starts fetching its titles. */

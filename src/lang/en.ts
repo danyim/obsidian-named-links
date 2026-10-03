@@ -46,6 +46,10 @@ const en = {
       name: 'Use the selection as the title',
       desc: 'When a URL is pasted over selected text, link that text instead of fetching a title.',
     },
+    pasteTitleOntoUrl: {
+      name: 'Paste text onto a selected URL as its title',
+      desc: 'When text is pasted over a selected URL or link, make the text its title instead of replacing the URL.',
+    },
     skipCodeAndFrontmatter: {
       name: 'Skip code and frontmatter',
       desc: 'Leave URLs pasted into code blocks, inline code or frontmatter as they are.',

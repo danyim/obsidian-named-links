@@ -11,6 +11,7 @@ Paste a URL into Obsidian and get a markdown link titled with the page's name: `
 
 - **Paste a URL** and a `[Fetching title…](url)` placeholder goes in straight away, then becomes the titled link. Several URLs pasted at once are each titled.
 - **Drop a URL** from another app and the same happens where you drop it.
+- **Paste text over a selected URL** (or a whole link) to make the text its title, with nothing fetched. This one is off until you turn it on in settings.
 - **Title URLs already in a note** with the [Add a title to an existing URL](#commands) command.
 - **Undo** gives back the URL as you pasted it; undo again to remove the paste.
 
@@ -37,6 +38,7 @@ None has a default hotkey; set one under Settings → Hotkeys.
 | Title pasted URLs | On | Fetch titles for pasted URLs. |
 | Title dropped URLs | On | Fetch titles for dropped URLs. |
 | Use the selection as the title | On | Pasting a URL over selected text links that text instead of fetching. |
+| Paste text onto a selected URL as its title | Off | Pasting text over a selected URL or link makes the text its title. Works with **Title pasted URLs** off too. |
 | Skip code and frontmatter | On | Leave URLs pasted into code or frontmatter alone. |
 | Remove the site name | Off | `Video - YouTube` becomes `Video`. See [Cleaning up titles](#cleaning-up-titles). |
 | Domain title rules | Empty | Find and replace for one site's titles, run first. |
