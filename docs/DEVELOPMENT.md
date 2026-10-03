@@ -14,6 +14,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | --- | --- |
 | `main.ts` | Plugin entry point: loads settings, registers the paste and drop handlers and the commands, and watches for Mod+Shift+V. |
 | `linker.ts` | Decides what a paste or drop inserts, puts placeholders in, and swaps each for its title (in the editor, or in the file if the editor has moved on). |
+| `history.ts` | Keeps a titled paste to two undo steps, the URL as pasted and then the title, with no placeholder in between. The paste goes in as an isolated history event, and each arriving title rewrites the plugin's own events on top of the history when the note hasn't changed since. |
 | `scraper.ts` | Finds a title for a URL: oEmbed, a HEAD request to spot files, then the page's HTML. No Obsidian imports, so it is unit tested under Node. |
 | `http.ts` | The scraper's HTTP client: Obsidian's `requestUrl` with a timeout. |
 | `url.ts` | Recognizes URLs and finds links and bare URLs on a line. |

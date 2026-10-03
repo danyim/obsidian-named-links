@@ -23,6 +23,14 @@ for this project's actual conventions. For anything not covered here, see
 - Node: 24.x (what CI runs; see `.github/workflows/test.yaml`).
 - Package manager: npm.
 - Bundler: esbuild, configured in `config/esbuild.config.mjs`.
+- `@codemirror/*` packages are devDependencies for their types only:
+  esbuild leaves them external, so the plugin runs against Obsidian's own
+  copies. Keep them pinned to what Obsidian ships (`@codemirror/state` and
+  `@codemirror/view` at the `obsidian` package's peer versions,
+  `@codemirror/commands` at the version found in Obsidian's `app.js`). The
+  `overrides` entry in `package.json` makes `@codemirror/commands` resolve
+  against that same `@codemirror/state`, since two copies of its types
+  don't type-check against each other.
 
 ```bash
 npm install
@@ -103,6 +111,20 @@ specs" section of [`docs/TESTING.md`](docs/TESTING.md) before writing one.
   (`minAppVersion` is 1.13.0+, so there is no `display()` fallback).
 - UI strings live in `src/lang/`. Add every new one to both `en.ts` and
   `ja.ts`.
+
+## Undo history
+
+A titled paste undoes in two steps: first back to the URL as pasted, then
+to before the paste. The placeholder never appears in the history.
+`src/history.ts` gets there by making the paste an isolated history event
+and, when a title arrives with the note unchanged since, undoing the
+plugin's own events and dispatching them again (URLs, then titles). Any
+change that puts placeholders or titles into the editor has to go through
+`insertTracked`, `changeTracked` and `finishPlaceholder`, not
+`editor.replaceRange`. Undo specs in `test/specs/undo.e2e.ts` need titles
+that take over half a second to arrive: CodeMirror merges an adjacent
+change made sooner into the same step on its own, which would hide the
+plugin's handling.
 
 ## Versioning & releases
 
