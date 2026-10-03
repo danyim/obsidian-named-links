@@ -1,7 +1,7 @@
 {
 	"id": "named-links",
 	"name": "Named Links",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"minAppVersion": "1.13.0",
 	"description": "Fetch the title of a pasted or dropped URL and insert it as a markdown link.",
 	"author": "danyim",
