@@ -25,6 +25,7 @@ becomes
 - **Dropping a URL** dragged in from a browser or another app does the same, at the spot where you drop it.
 - **Add a title to an existing URL** (a command, so give it a hotkey under Settings → Hotkeys) titles the URL under the cursor. On an existing `[text](url)` link it replaces the text with the fetched title, and a `<URL>` autolink becomes a titled link. With text selected, it titles every bare URL the selection touches, skipping code, frontmatter, and URLs that are already part of a link, image or reference definition.
 - **Paste URL and fetch its title** and **Paste without fetching a title** are commands too, for binding to hotkeys of your own.
+- **Undo** after a title arrives gives back the URL as you pasted it, and undoing again removes the paste. On a link added with **Add a title to an existing URL**, one undo returns it to what it was. If you edit the note while a title is still on its way, the first undo still gives back the URL, but the next one shows the placeholder rather than removing the paste.
 
 The URL is left exactly as pasted when:
 

@@ -15,6 +15,7 @@ import {
 } from 'obsidian';
 
 import { isInCode, isInFrontmatter, isLinkTargetPosition } from './context';
+import { changeTracked, finishPlaceholder, insertTracked } from './history';
 import { t } from './lang';
 import { NamedLinksSettings, isExcluded, parseExcludedSites } from './settings';
 import { formatTitle } from './title';
@@ -192,7 +193,14 @@ export class Linker {
 
   /** Inserts a plan at the selection and starts fetching its titles. */
   insert(editor: Editor, file: TFile | null, plan: InsertPlan): Promise<void> {
-    editor.replaceSelection(plan.text);
+    const links = plan.pending.map(({ placeholder, fallback }) => {
+      const found = locatePlaceholder(plan.text, placeholder);
+      const link = found ? plan.text.slice(found.start, found.end) : '';
+      return { link, fallback };
+    });
+    if (!insertTracked(editor, plan.text, links)) {
+      editor.replaceSelection(plan.text);
+    }
     return this.resolveAll(editor, file, plan.pending);
   }
 
@@ -245,10 +253,12 @@ export class Linker {
     for (const candidate of editors) {
       const found = locatePlaceholder(candidate.getValue(), item.placeholder);
       if (found) {
-        candidate.replaceRange(
-          replacement(found.destination),
-          candidate.offsetToPos(found.start),
-          candidate.offsetToPos(found.end)
+        finishPlaceholder(
+          candidate,
+          found.start,
+          found.end,
+          item.fallback,
+          title === null ? null : replacement(found.destination)
         );
         return;
       }
@@ -306,7 +316,16 @@ export class Linker {
     const from = { line: cursor.line, ch: link.start };
     const to = { line: cursor.line, ch: link.end };
     const original = line.slice(link.start, link.end);
-    editor.replaceRange(`[${placeholder}](${linkDestination(url)})`, from, to);
+    const text = `[${placeholder}](${linkDestination(url)})`;
+    if (
+      !changeTracked(
+        editor,
+        [{ from, to, text }],
+        [{ link: text, fallback: original }]
+      )
+    ) {
+      editor.replaceRange(text, from, to);
+    }
     await this.resolveAll(editor, file, [
       { placeholder, url, fallback: original },
     ]);
@@ -358,7 +377,13 @@ export class Linker {
     }
 
     // One transaction, so a single undo reverts every URL.
-    editor.transaction({ changes });
+    const links = changes.map((change, i) => ({
+      link: change.text,
+      fallback: pending[i].fallback,
+    }));
+    if (!changeTracked(editor, changes, links)) {
+      editor.transaction({ changes });
+    }
     await this.resolveAll(editor, file, pending);
   }
 }

@@ -28,6 +28,8 @@
   "author": "danyim",
   "license": "MIT",
   "devDependencies": {
+    "@codemirror/commands": "6.10.4",
+    "@codemirror/state": "6.5.0",
     "@codemirror/view": "6.38.6",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/mocha": "^10.0.10",
@@ -74,5 +76,10 @@
     "plugins": [
       "@trivago/prettier-plugin-sort-imports"
     ]
+  },
+  "overrides": {
+    "@codemirror/commands": {
+      "@codemirror/state": "$@codemirror/state"
+    }
   }
 }
