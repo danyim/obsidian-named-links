@@ -17,8 +17,9 @@ import {
 import { isInCode, isInFrontmatter, isLinkTargetPosition } from './context';
 import { changeTracked, finishPlaceholder, insertTracked } from './history';
 import { t } from './lang';
+import { needsTitle, renderLink, templateFor } from './linkFormat';
 import { NamedLinksSettings, isExcluded, parseExcludedSites } from './settings';
-import { formatTitle } from './title';
+import { readableTitle } from './title';
 import {
   findLinks,
   hostnameOf,
@@ -67,36 +68,15 @@ function newPlaceholder(): string {
   return t().placeholder + suffix;
 }
 
-/**
- * Selected text as link text. Brackets that don't pair up would end the link
- * text early or leave it open, so then every bracket is escaped.
- */
-function linkText(selection: string): string {
-  let depth = 0;
-  let balanced = true;
-  for (let i = 0; i < selection.length; i++) {
-    const ch = selection[i];
-    if (ch === '\\') i++;
-    else if (ch === '[') depth++;
-    else if (ch === ']' && --depth < 0) balanced = false;
-  }
-  if (balanced && depth === 0) return selection;
-  let out = '';
-  for (let i = 0; i < selection.length; i++) {
-    const ch = selection[i];
-    if (ch === '\\') {
-      out += ch + (selection[i + 1] ?? '');
-      i++;
-    } else {
-      out += ch === '[' || ch === ']' ? `\\${ch}` : ch;
-    }
-  }
-  return out;
-}
-
 // The destination of the link a placeholder heads, matched from just after
 // its "](". Accepts whatever the user may have edited it to meanwhile.
 const DESTINATION = /^(<[^>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)\)/;
+
+function stripAngles(destination: string): string {
+  return destination.startsWith('<') && destination.endsWith('>')
+    ? destination.slice(1, -1)
+    : destination;
+}
 
 function locatePlaceholder(
   text: string,
@@ -119,6 +99,20 @@ export class Linker {
 
   private get settings(): NamedLinksSettings {
     return this.host.settings;
+  }
+
+  /** The finished link for a URL, in the format the settings select. */
+  private link(url: string, title: string, titleIsMarkdown = false): string {
+    return renderLink(templateFor(this.settings), {
+      url,
+      title,
+      titleIsMarkdown,
+    });
+  }
+
+  /** Whether the link format shows a title, and so whether to fetch one. */
+  private get wantsTitle(): boolean {
+    return needsTitle(templateFor(this.settings));
   }
 
   /**
@@ -160,10 +154,7 @@ export class Linker {
       !selection.includes('\n')
     ) {
       const url = toAbsoluteUrl(unwrapAutolink(urls[0])) as string;
-      return {
-        text: `[${linkText(selection)}](${linkDestination(url)})`,
-        pending: [],
-      };
+      return { text: this.link(url, selection, true), pending: [] };
     }
 
     const excluded = parseExcludedSites(this.settings.excludedSites);
@@ -176,9 +167,11 @@ export class Linker {
       if (isImageUrl(url)) return token;
       if (isExcluded(url, excluded)) {
         return this.settings.excludedSiteFormat === 'domain'
-          ? `[${formatTitle(hostnameOf(url), 0)}](${linkDestination(url)})`
+          ? this.link(url, hostnameOf(url))
           : token;
       }
+      // A format without the title is finished straight away, unfetched.
+      if (!this.wantsTitle) return this.link(url, '');
       const placeholder = newPlaceholder();
       pending.push({ placeholder, url, fallback: token });
       return `[${placeholder}](${linkDestination(url)})`;
@@ -243,7 +236,10 @@ export class Linker {
     const replacement = (destination: string) =>
       title === null
         ? item.fallback
-        : `[${formatTitle(title, this.settings.maxTitleLength)}](${destination})`;
+        : this.link(
+            stripAngles(destination),
+            readableTitle(title, this.settings.maxTitleLength)
+          );
 
     // The editor that took the paste, if it is still on screen, then any
     // other editor showing the note. A closed editor's document can still
@@ -312,9 +308,13 @@ export class Linker {
       return;
     }
 
-    const placeholder = newPlaceholder();
     const from = { line: cursor.line, ch: link.start };
     const to = { line: cursor.line, ch: link.end };
+    if (!this.wantsTitle) {
+      editor.replaceRange(this.link(url, ''), from, to);
+      return;
+    }
+    const placeholder = newPlaceholder();
     const original = line.slice(link.start, link.end);
     const text = `[${placeholder}](${linkDestination(url)})`;
     if (
@@ -357,6 +357,14 @@ export class Linker {
         if (isInCode(text, offset) || isInFrontmatter(text, offset)) continue;
         const url = toAbsoluteUrl(link.url) as string;
         if (isImageUrl(url)) continue;
+        const range = {
+          from: { line: ln, ch: link.start },
+          to: { line: ln, ch: link.end },
+        };
+        if (!this.wantsTitle) {
+          changes.push({ ...range, text: this.link(url, '') });
+          continue;
+        }
         const placeholder = newPlaceholder();
         pending.push({
           placeholder,
@@ -364,14 +372,13 @@ export class Linker {
           fallback: line.slice(link.start, link.end),
         });
         changes.push({
-          from: { line: ln, ch: link.start },
-          to: { line: ln, ch: link.end },
+          ...range,
           text: `[${placeholder}](${linkDestination(url)})`,
         });
       }
     }
 
-    if (pending.length === 0) {
+    if (changes.length === 0) {
       new Notice(t().notices.noUrlInSelection);
       return;
     }

@@ -9,6 +9,7 @@ import {
 
 import { RuleProblem, parseDomainTitleRules, parseTitleRules } from './cleanup';
 import { t } from './lang';
+import { TemplateError, validateTemplate } from './linkFormat';
 import type NamedLinksPlugin from './main';
 import {
   AUTO_LINK_TITLE_NAME,
@@ -86,6 +87,21 @@ export class NamedLinksSettingTab extends PluginSettingTab {
       [key]: value,
     });
     await this.plugin.saveSettings();
+    // The custom format field shows only for the Custom preset.
+    if (key === 'linkFormat') this.refreshDomState();
+  }
+
+  private templateError(error: TemplateError | null): string | undefined {
+    if (!error) return undefined;
+    const messages = t().settings.templateErrors;
+    switch (error.code) {
+      case 'missingUrl':
+        return messages.missingUrl;
+      case 'unknownPlaceholder':
+        return messages.unknownPlaceholder(error.name);
+      case 'unquotedInTag':
+        return messages.unquotedInTag(error.name);
+    }
   }
 
   private async runImport(): Promise<void> {
@@ -253,6 +269,38 @@ export class NamedLinksSettingTab extends PluginSettingTab {
                 url: s.excludedSiteFormat.url,
                 domain: s.excludedSiteFormat.domain,
               },
+            },
+          },
+        ],
+      },
+      {
+        type: 'group',
+        heading: s.linkFormatHeading,
+        items: [
+          {
+            ...s.linkFormat,
+            control: {
+              type: 'dropdown',
+              key: 'linkFormat',
+              defaultValue: DEFAULT_SETTINGS.linkFormat,
+              options: {
+                markdown: s.linkFormat.markdown,
+                'markdown-title': s.linkFormat.markdownTitle,
+                html: s.linkFormat.html,
+                custom: s.linkFormat.custom,
+              },
+            },
+          },
+          {
+            ...s.customLinkFormat,
+            visible: () => this.plugin.settings.linkFormat === 'custom',
+            control: {
+              type: 'text',
+              key: 'customLinkFormat',
+              defaultValue: DEFAULT_SETTINGS.customLinkFormat,
+              placeholder: DEFAULT_SETTINGS.customLinkFormat,
+              validate: (value: string) =>
+                this.templateError(validateTemplate(value)),
             },
           },
         ],

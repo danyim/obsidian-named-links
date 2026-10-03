@@ -38,7 +38,12 @@ export function escapeMarkdown(text: string): string {
     .replace(/^\^/, '\\^');
 }
 
+/** A fetched title as it should read, before escaping for where it goes. */
+export function readableTitle(raw: string, maxLength: number): string {
+  return truncateTitle(cleanTitle(raw), maxLength);
+}
+
 /** Clean, truncate, then escape, so the limit counts visible characters. */
 export function formatTitle(raw: string, maxLength: number): string {
-  return escapeMarkdown(truncateTitle(cleanTitle(raw), maxLength));
+  return escapeMarkdown(readableTitle(raw, maxLength));
 }

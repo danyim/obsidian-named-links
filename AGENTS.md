@@ -61,10 +61,10 @@ CI runs lint, type-check, and both test layers on every push and PR.
 ## File & folder conventions
 
 See the table in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). The rule that
-matters most: `url.ts`, `title.ts`, `context.ts`, `scraper.ts` and
-`settings.ts` must not import `obsidian`, because the unit tests run them under
-plain Node. The scraper takes its HTTP client as an argument for the same
-reason.
+matters most: `url.ts`, `title.ts`, `context.ts`, `scraper.ts`,
+`linkFormat.ts` and `settings.ts` must not import `obsidian`, because the unit
+tests run them under plain Node. The scraper takes its HTTP client as an
+argument for the same reason.
 
 Other top-level directories:
 
