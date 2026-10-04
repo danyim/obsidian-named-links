@@ -109,7 +109,7 @@ export class Linker {
    * finished link goes through here; the request and the fallback for a
    * missing title use the URL as it came.
    */
-  private link(url: string, title: string, titleIsMarkdown = false): string {
+  link(url: string, title: string, titleIsMarkdown = false): string {
     return renderLink(templateFor(this.settings), {
       url: this.settings.decodeUrls ? decodeUrlForDisplay(url) : url,
       title,
@@ -118,7 +118,7 @@ export class Linker {
   }
 
   /** Whether the link format shows a title, and so whether to fetch one. */
-  private get wantsTitle(): boolean {
+  get wantsTitle(): boolean {
     return needsTitle(templateFor(this.settings));
   }
 

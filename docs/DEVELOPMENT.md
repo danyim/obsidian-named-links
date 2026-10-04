@@ -19,6 +19,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `http.ts` | The scraper's HTTP client: Obsidian's `requestUrl` with a timeout. |
 | `url.ts` | Recognizes URLs and finds links and bare URLs on a line. |
 | `title.ts` | Cleans, shortens and escapes a title for use as link text. |
+| `api.ts` | The API other plugins and scripts use (`plugin.api`). Only type imports from Obsidian-facing modules, so the unit tests run it against a fake host. Its shape is versioned: see the README's Scripting section before changing it. |
 | `cleanup.ts` | The optional clean-up between fetching a title and shortening it: removing the site name, and the user's title rules. |
 | `context.ts` | Tells whether a position is in code, frontmatter or a link target. |
 | `settings.ts` | The settings shape and defaults, excluded-site matching, and the Auto Link Title import. |
