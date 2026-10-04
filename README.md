@@ -13,6 +13,7 @@ Paste a URL into Obsidian and get a markdown link titled with the page's name: `
 - **Drop a URL** from another app and the same happens where you drop it.
 - **Paste text over a selected URL** (or a whole link) to make the text its title, with nothing fetched. This one is off until you turn it on in settings.
 - **Title URLs already in a note** with the [Add a title to an existing URL](#commands) command.
+- **In vim mode**, putting a URL with `p` or `P` titles it the same way, counts, registers and visual mode included.
 - **Undo** gives back the URL as you pasted it; undo again to remove the paste.
 
 The URL is left as pasted when you paste as plain text (Ctrl/Cmd+Shift+V, a system shortcut, not one the plugin adds), paste with several cursors, paste into code, frontmatter or a link target (`[text](`, `[1]: `, `href="`), or paste an image or an excluded site's URL. If no title can be found, the URL stays and a notice says so.

@@ -236,6 +236,55 @@ export class Linker {
     return this.resolveAll(editor, file, plan.pending);
   }
 
+  /**
+   * What to put in place of text that was just inserted at `from`..`to`
+   * (offsets), by the same rules as a paste, or null to leave it. For vim's
+   * `p` and `P` (upstream #7), which insert without a paste event.
+   */
+  planInserted(editor: Editor, from: number, to: number): InsertPlan | null {
+    const text = editor.getValue().slice(from, to);
+    // A charwise put with a count runs copies of a URL together into one
+    // token that still parses as a URL; fetching that would only fail.
+    const runTogether = text
+      .trim()
+      .split(/\s+/)
+      .some((token) => (token.match(/https?:\/\/|www\./gi) ?? []).length > 1);
+    if (runTogether) return null;
+    const lead = text.length - text.trimStart().length;
+    if (this.isRawContext(editor, editor.offsetToPos(from + lead))) {
+      return null;
+    }
+    const plan = this.plan(text, '');
+    return plan && plan.text !== text ? plan : null;
+  }
+
+  /**
+   * Puts `plan` in place of the text at `from`..`to` and starts fetching its
+   * titles. One undo event, so the first undo after the titles arrive gives
+   * back what was inserted, as with a paste.
+   */
+  replaceInserted(
+    editor: Editor,
+    file: TFile | null,
+    from: number,
+    to: number,
+    plan: InsertPlan
+  ): Promise<void> {
+    const links = plan.pending.map(({ placeholder, fallback }) => {
+      const found = locatePlaceholder(plan.text, placeholder);
+      const link = found ? plan.text.slice(found.start, found.end) : '';
+      return { link, fallback };
+    });
+    const range = {
+      from: editor.offsetToPos(from),
+      to: editor.offsetToPos(to),
+    };
+    if (!changeTracked(editor, [{ ...range, text: plan.text }], links)) {
+      editor.replaceRange(plan.text, range.from, range.to);
+    }
+    return this.resolveAll(editor, file, plan.pending);
+  }
+
   async resolveAll(
     editor: Editor,
     file: TFile | null,
