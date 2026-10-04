@@ -40,7 +40,7 @@ const ja: Strings = {
     whenHeading: 'タイトルを取得するタイミング',
     enhancePaste: {
       name: 'デフォルト貼り付けを拡張',
-      desc: 'デフォルトの貼り付けコマンドでリンクを貼り付ける際にリンクタイトルを取得する。Ctrl/Cmd+Shift+V で貼り付けた場合はURLをそのまま貼り付けます。',
+      desc: 'デフォルトの貼り付けコマンドでリンクを貼り付ける際にリンクタイトルを取得する。プレーンテキストとして貼り付けた場合（Ctrl/Cmd+Shift+V）はURLをそのまま貼り付けます。',
     },
     enhanceDrop: {
       name: 'ドロップイベントを拡張',

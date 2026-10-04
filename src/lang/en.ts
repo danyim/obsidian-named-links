@@ -36,7 +36,7 @@ const en = {
     whenHeading: 'When to fetch titles',
     enhancePaste: {
       name: 'Title pasted URLs',
-      desc: 'Fetch the title of a URL pasted with the normal paste command. Pasting with Ctrl/Cmd+Shift+V always leaves the URL as it is.',
+      desc: 'Fetch the title of a URL pasted with the normal paste command. Pasting as plain text (Ctrl/Cmd+Shift+V) always leaves the URL as it is.',
     },
     enhanceDrop: {
       name: 'Title dropped URLs',

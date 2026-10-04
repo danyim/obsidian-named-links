@@ -269,6 +269,36 @@ describe('Pasting a URL', function () {
     });
   });
 
+  // Real keystrokes through WebDriver, with the URL on the real clipboard,
+  // rather than synthetic events: what Obsidian does with each shortcut is
+  // the thing under test.
+  describe('with real keystrokes', function () {
+    async function pressWithClipboard(text: string, keys: string[]) {
+      await browser.executeObsidian(async (_, text) => {
+        await navigator.clipboard.writeText(text);
+      }, text);
+      await browser.keys(keys);
+      await browser.pause(300);
+      await settled();
+    }
+
+    it('titles a URL pasted with Ctrl+V', async function () {
+      await openNote('‸');
+      const url = `${base}/page?title=Keyed`;
+      await pressWithClipboard(url, ['Control', 'v']);
+      expect(await editorValue()).toBe(`[Keyed](${url})`);
+    });
+
+    it('leaves every paste from Ctrl+Shift+V alone', async function () {
+      // Obsidian fires two paste events for one Ctrl+Shift+V; neither may be
+      // titled, whatever Obsidian itself inserts for them.
+      await openNote('‸');
+      await pressWithClipboard(`${base}/page`, ['Control', 'Shift', 'v']);
+      expect(await editorValue()).not.toContain('](');
+      expect(requestLog()).toEqual([]);
+    });
+  });
+
   describe('over a selection', function () {
     it('replaces the selection with the titled link when set to', async function () {
       await setSettings({ useSelectionAsTitle: false });

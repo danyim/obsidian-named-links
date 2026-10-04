@@ -24,7 +24,8 @@ import { NamedLinksSettingTab } from './settingsTab';
 
 const REQUEST_TIMEOUT_MS = 15 * 1000;
 
-// How long after Mod+Shift+V a paste still counts as a plain-text paste.
+// The longest a Mod+Shift+V keystroke counts as a plain-text paste, when no
+// other key is pressed after it.
 const PLAIN_PASTE_WINDOW_MS = 1000;
 
 function fileOf(info: MarkdownView | MarkdownFileInfo | null): TFile | null {
@@ -94,10 +95,9 @@ export default class NamedLinksPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on('editor-paste', (evt, editor, info) => {
         if (evt.defaultPrevented) return;
-        // The chord marks one paste as plain, not every paste after it.
-        const plain = Date.now() < this.plainPasteUntil;
-        this.plainPasteUntil = 0;
-        if (plain) return;
+        // Every paste the chord produces is plain: Obsidian fires two paste
+        // events for one Mod+Shift+V. The next keystroke ends it.
+        if (Date.now() < this.plainPasteUntil) return;
 
         const text = evt.clipboardData?.getData('text/plain') ?? '';
         // Its own setting rather than part of titling pasted URLs: nothing
@@ -175,11 +175,15 @@ export default class NamedLinksPlugin extends Plugin {
   }
 
   /**
-   * Obsidian's own shortcut for pasting as plain text is Mod+Shift+V, and it
-   * still fires a paste event. Remembering the chord here lets that paste go
+   * Mod+Shift+V is the system's paste-as-plain-text shortcut, which Obsidian
+   * inherits from Chromium rather than binding as a command, and it still
+   * fires paste events. Remembering the chord here lets those pastes go
    * through untouched, without this plugin claiming the hotkey itself
-   * (upstream #39, #101, #121, #170). `code` rather than `key` so it works
-   * with any keyboard layout.
+   * (upstream #39, #101, #121, #170).
+   *
+   * The chord counts until the next keystroke rather than for one paste:
+   * Obsidian fires two paste events for one Mod+Shift+V, and the second was
+   * being titled. Any other key, including the next Mod+V, ends it.
    */
   private watchWindow(win: Window) {
     this.registerDomEvent(
@@ -194,6 +198,8 @@ export default class NamedLinksPlugin extends Plugin {
           (evt.ctrlKey || evt.metaKey)
         ) {
           this.plainPasteUntil = Date.now() + PLAIN_PASTE_WINDOW_MS;
+        } else {
+          this.plainPasteUntil = 0;
         }
       },
       { capture: true }

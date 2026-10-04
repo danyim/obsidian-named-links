@@ -101,7 +101,8 @@ export function editorValue(): Promise<string> {
  * handles itself, so whether the plugin acted shows in the text, not the
  * event.
  *
- * `plain` presses Mod+Shift+V first, as pasting as plain text does.
+ * A Mod+V keydown comes first, or Mod+Shift+V with `plain`, as a keyboard
+ * paste does.
  */
 export async function paste(
   text: string,
@@ -111,18 +112,16 @@ export async function paste(
     ({ app, obsidian }, text, plain) => {
       const view = app.workspace.getActiveViewOfType(obsidian.MarkdownView)!;
       const content = (view.editor as any).cm.contentDOM as HTMLElement;
-      if (plain) {
-        content.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: 'V',
-            code: 'KeyV',
-            ctrlKey: true,
-            shiftKey: true,
-            bubbles: true,
-            cancelable: true,
-          })
-        );
-      }
+      content.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: plain ? 'V' : 'v',
+          code: 'KeyV',
+          ctrlKey: true,
+          shiftKey: plain,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
       const data = new DataTransfer();
       data.setData('text/plain', text);
       const evt = new ClipboardEvent('paste', {
