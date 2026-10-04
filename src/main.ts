@@ -14,6 +14,7 @@ import { cleanupTitle } from './cleanup';
 import { ClipboardLinkData, copiedLinkTitle } from './clipboardTitle';
 import { obsidianHttpClient } from './http';
 import { t } from './lang';
+import { pageFieldsIn, templateFor } from './linkFormat';
 import { Linker } from './linker';
 import { OEmbedProvider, PageInfo, fetchPageInfo } from './scraper';
 import {
@@ -112,6 +113,7 @@ export default class NamedLinksPlugin extends Plugin {
       language: getLanguage(),
       twitterProxy: this.settings.twitterProxy,
       oEmbedProviders: this.oEmbedProviders,
+      fields: pageFieldsIn(templateFor(this.settings)),
     }).then((info) =>
       info === null
         ? null

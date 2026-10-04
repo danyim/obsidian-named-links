@@ -42,6 +42,11 @@ export interface FetchTitleOptions {
   twitterProxy?: boolean;
   /** Replaces the built-in oEmbed providers; the e2e suite points it locally. */
   oEmbedProviders?: OEmbedProvider[];
+  /**
+   * The page fields the link format shows besides the title. When oEmbed
+   * answers without one of them, the page itself is read for it too.
+   */
+  fields?: readonly ('author' | 'site' | 'description' | 'section')[];
 }
 
 /**
@@ -478,8 +483,45 @@ export async function fetchPageInfo(
   if (options.language) headers['Accept-Language'] = options.language;
 
   const embedded = await oEmbedInfo(absolute, options, headers);
-  if (embedded) return embedded;
+  if (embedded) {
+    // oEmbed gives a title and often an author, but rarely a description,
+    // and never the heading a fragment points at. Read the page as well
+    // when the link format shows one of those and oEmbed left it out.
+    const missing = (options.fields ?? []).some(
+      (field) => embedded[FIELD_KEYS[field]] === null
+    );
+    if (!missing) return embedded;
+    const page = await pageInfoFromHtml(absolute, options, headers);
+    return page ? mergePageInfo(embedded, page) : embedded;
+  }
 
+  return pageInfoFromHtml(absolute, options, headers);
+}
+
+const FIELD_KEYS = {
+  author: 'author',
+  site: 'siteName',
+  description: 'description',
+  section: 'section',
+} as const;
+
+/** `primary`'s values, with `fallback` filling the ones it lacks. */
+function mergePageInfo(primary: PageInfo, fallback: PageInfo): PageInfo {
+  return {
+    title: primary.title,
+    siteName: primary.siteName ?? fallback.siteName,
+    author: primary.author ?? fallback.author,
+    description: primary.description ?? fallback.description,
+    section: primary.section ?? fallback.section,
+  };
+}
+
+/** What the page at `absolute` says about itself, read from its HTML. */
+async function pageInfoFromHtml(
+  absolute: string,
+  options: FetchTitleOptions,
+  headers: Record<string, string>
+): Promise<PageInfo | null> {
   const mirror = options.twitterProxy ? twitterProxyUrl(absolute) : null;
   if (mirror) {
     const res = await tryRequest(options.http, {

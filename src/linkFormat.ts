@@ -208,6 +208,29 @@ export function needsTitle(template: string): boolean {
   return parse(template).some((piece) => piece.placeholder === 'title');
 }
 
+/** Something a page says about itself, other than its title. */
+export type PageField = 'author' | 'site' | 'description' | 'section';
+
+const PAGE_FIELDS: readonly PageField[] = [
+  'author',
+  'site',
+  'description',
+  'section',
+];
+
+/**
+ * The page fields the template shows besides the title, so a lookup can
+ * tell which of them it has to find.
+ */
+export function pageFieldsIn(template: string): PageField[] {
+  const shown = new Set<PageField>();
+  for (const piece of parse(template)) {
+    const name = piece.placeholder as PageField | undefined;
+    if (name && PAGE_FIELDS.includes(name)) shown.add(name);
+  }
+  return [...shown];
+}
+
 /**
  * Whether rendering the template needs the page fetched at all: it shows the
  * title, author, site, description or section. `{date}`, `{url}` and

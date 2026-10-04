@@ -7,6 +7,7 @@ import {
   localIsoDate,
   needsPageInfo,
   needsTitle,
+  pageFieldsIn,
   renderLink,
   templateFor,
   validateTemplate,
@@ -455,5 +456,22 @@ describe('mergeSettings and the link format', () => {
 
   it('keeps a known one', () => {
     assert.equal(mergeSettings({ linkFormat: 'custom' }).linkFormat, 'custom');
+  });
+});
+
+describe('pageFieldsIn', () => {
+  it('lists the page fields a template shows besides the title', () => {
+    assert.deepEqual(
+      pageFieldsIn('[{title} - {author}]({url} "{description}") {author}'),
+      ['author', 'description']
+    );
+    assert.deepEqual(pageFieldsIn('[{site}: {section}]({url})'), [
+      'site',
+      'section',
+    ]);
+  });
+
+  it('is empty for the title, URL, domain and date alone', () => {
+    assert.deepEqual(pageFieldsIn('[{title}]({url}) {domain} {date}'), []);
   });
 });

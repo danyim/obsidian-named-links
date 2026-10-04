@@ -21,6 +21,7 @@ import { t } from './lang';
 import {
   needsPageInfo,
   needsTitle,
+  pageFieldsIn,
   renderLink,
   templateFor,
 } from './linkFormat';
@@ -52,6 +53,12 @@ interface PendingTitle {
   url: string;
   /** What goes back in place of the placeholder if no title is found. */
   fallback: string;
+  /**
+   * A title already known (a selection used as the title), when the lookup
+   * is only for the format's other placeholders. It's markdown of the user's
+   * own, kept as it is.
+   */
+  knownTitle?: string;
 }
 
 export interface InsertPlan {
@@ -199,7 +206,20 @@ export class Linker {
       !selection.includes('\n')
     ) {
       const url = toAbsoluteUrl(unwrapAutolink(urls[0])) as string;
-      return { text: this.link(url, selection, true), pending: [] };
+      // The selection is the title, but a format that also shows the
+      // author, site, description or section still needs the page for
+      // those. Without it, the link with only the selection is final.
+      const withSelection = this.link(url, selection, true);
+      if (pageFieldsIn(templateFor(this.settings)).length === 0) {
+        return { text: withSelection, pending: [] };
+      }
+      const placeholder = newPlaceholder();
+      return {
+        text: `[${placeholder}](${linkDestination(url)})`,
+        pending: [
+          { placeholder, url, fallback: withSelection, knownTitle: selection },
+        ],
+      };
     }
 
     const excluded = parseExcludedSites(this.settings.excludedSites);
@@ -359,19 +379,24 @@ export class Linker {
     }
     const title = page?.title ?? null;
 
-    if (title === null) {
+    // A known title still makes a link when the page can't be read: the
+    // fallback is that link with the page's fields empty, so there is
+    // nothing to tell the user.
+    if (title === null && item.knownTitle === undefined) {
       new Notice(t().notices.noTitle(hostnameOf(item.url)));
     }
 
     const replacement = (destination: string) =>
-      title === null
-        ? item.fallback
-        : this.link(
-            stripAngles(destination),
-            readableTitle(title, this.settings.maxTitleLength),
-            false,
-            page
-          );
+      item.knownTitle !== undefined
+        ? this.link(stripAngles(destination), item.knownTitle, true, page)
+        : title === null
+          ? item.fallback
+          : this.link(
+              stripAngles(destination),
+              readableTitle(title, this.settings.maxTitleLength),
+              false,
+              page
+            );
 
     // The editor that took the paste, if it is still on screen, then any
     // other editor showing the note. A closed editor's document can still

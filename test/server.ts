@@ -125,9 +125,14 @@ function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         </body></html>`
       );
     case '/video':
-      // Stands in for a video site whose page says nothing useful; its
-      // oEmbed endpoint below has the real title and channel.
-      return html(page('Video site'));
+      // Stands in for a video site whose page title says nothing useful;
+      // its oEmbed endpoint below has the real title and channel, but no
+      // description, which only the page has.
+      return html(
+        `<!doctype html><html><head><title>Video site</title>
+        <meta property="og:description" content="What the video is about">
+        </head><body></body></html>`
+      );
     case '/oembed': {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(

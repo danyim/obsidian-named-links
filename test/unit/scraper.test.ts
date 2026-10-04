@@ -485,3 +485,58 @@ describe('fetchTitle', () => {
     });
   });
 });
+
+describe('fetchPageInfo after oEmbed', () => {
+  const provider = {
+    pattern: /\/video$/,
+    endpoint: 'https://oembed.example/oembed',
+  };
+  const url = 'https://video.example/video';
+  const route = (req: HttpRequest) =>
+    req.url.startsWith(provider.endpoint)
+      ? {
+          headers: { 'content-type': 'application/json' },
+          html: JSON.stringify({ title: 'A video', author_name: 'A Channel' }),
+        }
+      : {
+          html: '<html><head><title>Video site</title><meta property="og:description" content="About it"><meta name="author" content="Page author"></head></html>',
+        };
+
+  it('stops at oEmbed when the format needs nothing it left out', async () => {
+    const { http, requests } = fakeHttp(route);
+    const info = await fetchPageInfo(url, {
+      http,
+      oEmbedProviders: [provider],
+      fields: ['author'],
+    });
+    assert.equal(info?.title, 'A video');
+    assert.equal(info?.author, 'A Channel');
+    assert.equal(requests.length, 1);
+  });
+
+  it("reads the page for a field oEmbed left out, keeping oEmbed's values", async () => {
+    const { http, requests } = fakeHttp(route);
+    const info = await fetchPageInfo(url, {
+      http,
+      oEmbedProviders: [provider],
+      fields: ['author', 'description'],
+    });
+    assert.equal(info?.title, 'A video');
+    assert.equal(info?.author, 'A Channel');
+    assert.equal(info?.description, 'About it');
+    assert.ok(requests.some((r) => r.url === url && r.method === 'GET'));
+  });
+
+  it("keeps oEmbed's answer when the page can't be read", async () => {
+    const { http } = fakeHttp((req) =>
+      req.url.startsWith(provider.endpoint) ? route(req) : { status: 500 }
+    );
+    const info = await fetchPageInfo(url, {
+      http,
+      oEmbedProviders: [provider],
+      fields: ['description'],
+    });
+    assert.equal(info?.title, 'A video');
+    assert.equal(info?.description, null);
+  });
+});

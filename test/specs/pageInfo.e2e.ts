@@ -89,6 +89,53 @@ describe('Link format placeholders from the page', function () {
     expect(requestLog().some((r) => r.path.startsWith('/oembed'))).toBe(true);
   });
 
+  it('reads what oEmbed leaves out from the page', async function () {
+    await browser.executeObsidian(({ app }, base) => {
+      (app as any).plugins.plugins['named-links'].oEmbedProviders = [
+        { pattern: /\/video$/, endpoint: `${base}/oembed` },
+      ];
+    }, base);
+    await custom('[{title}]({url} "{description}")');
+    const url = `${base}/video`;
+    expect(await pasteInto(url)).toBe(
+      `[A video](${url} "What the video is about")`
+    );
+    const paths = requestLog().map((r) => `${r.method} ${r.path}`);
+    expect(paths.some((p) => p.startsWith('GET /oembed'))).toBe(true);
+    expect(paths).toContain('GET /video');
+  });
+
+  it("doesn't read the page when oEmbed has everything", async function () {
+    await browser.executeObsidian(({ app }, base) => {
+      (app as any).plugins.plugins['named-links'].oEmbedProviders = [
+        { pattern: /\/video$/, endpoint: `${base}/oembed` },
+      ];
+    }, base);
+    await custom('[{title} ({author})]({url})');
+    await pasteInto(`${base}/video`);
+    expect(requestLog().some((r) => r.path === '/video')).toBe(false);
+  });
+
+  it('fills the page fields around a selection used as the title', async function () {
+    await custom('[{title} - {author}]({url})');
+    await openNote('see «my pick» now');
+    const url = `${base}/about`;
+    await paste(url);
+    await settled();
+    expect(await editorValue()).toBe(
+      `see [my pick - Ada Lovelace](${url}) now`
+    );
+  });
+
+  it('keeps the selection as the title when the page has no answer', async function () {
+    await custom('[{title} - {author}]({url})');
+    await openNote('see «my pick» now');
+    const url = `${base}/missing`;
+    await paste(url);
+    await settled();
+    expect(await editorValue()).toBe(`see [my pick](${url}) now`);
+  });
+
   it('writes the date without fetching anything (upstream #86)', async function () {
     await custom('[source]({url}) {date} {date:YYYY}');
     const url = `${base}/about`;
