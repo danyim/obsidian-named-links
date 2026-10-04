@@ -14,9 +14,10 @@ for this project's actual conventions. For anything not covered here, see
 - Entry point: `src/main.ts`, bundled to `main.js` by esbuild.
 - Release artifacts: `main.js`, `manifest.json`, `styles.css`, plus a
   `named-links-<version>.zip` of the three for manual installs.
-- Makes network requests, by design: to the URL being titled, and to oEmbed
-  endpoints for a few video and music sites. Settings are the only persisted
-  state, stored via `loadData()`/`saveData()`.
+- Makes network requests, by design: to the URL being titled (for an arXiv
+  paper, its abstract page), and to oEmbed endpoints for a few video and
+  music sites. Settings are the only persisted state, stored via
+  `loadData()`/`saveData()`.
 
 ## Environment & tooling
 
@@ -150,8 +151,8 @@ Specific to this plugin:
 - Never run a fetched page's code. Titles come from parsing HTML as data. Do
   not reintroduce Electron `BrowserWindow`s, `webview`s or iframes to load
   pages; that was the upstream plugin's most serious problem.
-- Network requests go only to the URL being titled and to the oEmbed
-  endpoints in `scraper.ts`. Any other destination (like the FxTwitter option)
+- Network requests go only to the URL being titled (for an arXiv paper, its
+  abstract page) and to the oEmbed endpoints in `scraper.ts`. Any other destination (like the FxTwitter option)
   must be opt-in, off by default, and disclosed in the README's Privacy
   section and in the setting's description.
 - Every request goes through `http.ts`, which enforces a timeout.
