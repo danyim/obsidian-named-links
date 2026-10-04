@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   HttpRequest,
   HttpResponse,
+  arxivAbstractUrl,
   decodeHtml,
   extractPageInfo,
   extractSection,
@@ -482,6 +483,116 @@ describe('fetchTitle', () => {
         off.requests.every((r) => r.url === url),
         true
       );
+    });
+  });
+
+  describe('arXiv papers (upstream #111)', () => {
+    const abstractPage = `<html><head>
+      <title>[2206.08077] Neural Scene Representation for Locomotion on Structured Terrain</title>
+      <meta property="og:site_name" content="arXiv.org">
+      <meta name="citation_title" content="Neural Scene Representation for Locomotion on Structured Terrain">
+      <meta property="og:description" content="Legged robots need to see the terrain.">
+      </head><body></body></html>`;
+    const paperTitle =
+      'Neural Scene Representation for Locomotion on Structured Terrain';
+
+    it('maps paper URLs to the abstract page', () => {
+      const cases: [string, string | null][] = [
+        [
+          'https://arxiv.org/pdf/2206.08077.pdf',
+          'https://arxiv.org/abs/2206.08077',
+        ],
+        [
+          'https://arxiv.org/pdf/2206.08077',
+          'https://arxiv.org/abs/2206.08077',
+        ],
+        [
+          'https://arxiv.org/pdf/2206.08077v2',
+          'https://arxiv.org/abs/2206.08077v2',
+        ],
+        [
+          'http://www.arxiv.org/abs/2206.08077',
+          'https://arxiv.org/abs/2206.08077',
+        ],
+        [
+          'https://export.arxiv.org/pdf/2206.08077v1.pdf',
+          'https://arxiv.org/abs/2206.08077v1',
+        ],
+        [
+          'https://arxiv.org/html/2206.08077v1/',
+          'https://arxiv.org/abs/2206.08077v1',
+        ],
+        [
+          'https://arxiv.org/pdf/hep-th/9901001v1',
+          'https://arxiv.org/abs/hep-th/9901001v1',
+        ],
+        [
+          'https://arxiv.org/abs/math.GT/0309136',
+          'https://arxiv.org/abs/math.GT/0309136',
+        ],
+        ['https://arxiv.org/list/cs.RO/recent', null],
+        ['https://arxiv.org/', null],
+        ['https://example.com/pdf/2206.08077.pdf', null],
+      ];
+      for (const [url, expected] of cases) {
+        assert.equal(arxivAbstractUrl(url), expected, url);
+      }
+    });
+
+    it("titles a PDF link from the paper's abstract page", async () => {
+      const { http, requests } = fakeHttp(() => ({ html: abstractPage }));
+      assert.equal(
+        await fetchTitle('https://arxiv.org/pdf/2206.08077.pdf', { http }),
+        paperTitle
+      );
+      assert.deepEqual(
+        requests.map((r) => `${r.method} ${r.url}`),
+        ['GET https://arxiv.org/abs/2206.08077']
+      );
+    });
+
+    it("keeps the abstract page's other fields", async () => {
+      const { http } = fakeHttp(() => ({ html: abstractPage }));
+      assert.deepEqual(
+        await fetchPageInfo('https://arxiv.org/pdf/2206.08077', { http }),
+        {
+          title: paperTitle,
+          siteName: 'arXiv.org',
+          author: null,
+          description: 'Legged robots need to see the terrain.',
+          section: null,
+        }
+      );
+    });
+
+    it('gives an abstract link the same title as its PDF', async () => {
+      const { http } = fakeHttp(() => ({ html: abstractPage }));
+      assert.equal(
+        await fetchTitle('https://arxiv.org/abs/2206.08077', { http }),
+        paperTitle
+      );
+    });
+
+    it("falls back to the abstract page's <title>", async () => {
+      const { http } = fakeHttp(() => ({ html: page('Some paper') }));
+      assert.equal(
+        await fetchTitle('https://arxiv.org/pdf/2206.08077', { http }),
+        'Some paper'
+      );
+    });
+
+    it('names the PDF by its path when the abstract page fails', async () => {
+      const { http, requests } = fakeHttp(() => ({ status: 503 }));
+      assert.equal(
+        await fetchTitle('https://arxiv.org/pdf/2206.08077.pdf', { http }),
+        '2206.08077.pdf'
+      );
+      assert.equal(requests.length, 1);
+      assert.equal(
+        await fetchTitle('https://arxiv.org/abs/2206.08077', { http }),
+        null
+      );
+      assert.equal(requests.length, 2);
     });
   });
 });

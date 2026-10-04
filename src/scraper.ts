@@ -126,6 +126,26 @@ export function twitterProxyUrl(url: string): string | null {
   return parsed.toString();
 }
 
+const ARXIV_HOSTS = new Set(['arxiv.org', 'www.arxiv.org', 'export.arxiv.org']);
+
+// A paper's id, new style (2206.08077) or old (hep-th/9901001, math.GT/0309136),
+// with an optional version, then the ".pdf" or trailing slash some links carry.
+const ARXIV_PAPER_PATH =
+  /^\/(?:abs|pdf|html)\/((?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?\/\d{7})(?:v\d+)?)(?:\.pdf)?\/?$/i;
+
+/**
+ * The abstract page of an arXiv paper URL (its PDF, abstract or HTML
+ * version), or null for any other URL. arXiv's PDFs mostly carry no title of
+ * their own: LaTeX leaves the PDF's metadata title empty unless the author
+ * sets one. The abstract page names the paper in a citation_title tag.
+ */
+export function arxivAbstractUrl(url: string): string | null {
+  const parsed = new URL(url);
+  if (!ARXIV_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+  const match = parsed.pathname.match(ARXIV_PAPER_PATH);
+  return match ? `https://arxiv.org/abs/${match[1]}` : null;
+}
+
 // FxTwitter only answers with metadata to clients it recognizes as link
 // preview bots; to anything that looks like a browser it redirects to X.
 const LINK_PREVIEW_USER_AGENT =
@@ -446,6 +466,29 @@ async function oEmbedInfo(
   }
 }
 
+/** What a paper's arXiv abstract page says about it. */
+async function arxivInfo(
+  abstractUrl: string,
+  options: FetchTitleOptions,
+  headers: Record<string, string>
+): Promise<PageInfo | null> {
+  const res = await tryRequest(options.http, {
+    url: abstractUrl,
+    method: 'GET',
+    headers,
+  });
+  if (!res || res.status >= 400) return null;
+
+  const html = decodeHtml(res.body(), header(res, 'content-type'));
+  const info = extractPageInfo(html, abstractUrl);
+  if (!info) return null;
+  // The page's <title> leads with the paper's id: "[2206.08077] Title".
+  const citation = usable(
+    metaContent(parseHtml(html), 'meta[name="citation_title"]')
+  );
+  return citation ? { ...info, title: citation } : info;
+}
+
 /**
  * The title for a URL, or null when none could be found: the site is
  * unreachable, answered with an error, or its page has no title.
@@ -469,18 +512,30 @@ export async function fetchPageInfo(
   const absolute = toAbsoluteUrl(url);
   if (!absolute) return null;
 
+  const headers: Record<string, string> = {
+    'User-Agent': USER_AGENT,
+    Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+  };
+  if (options.language) headers['Accept-Language'] = options.language;
+
+  // Reading a paper's title out of its PDF would take a download, and most
+  // of the time find nothing (upstream #111).
+  const abstractUrl = arxivAbstractUrl(absolute);
+  if (abstractUrl) {
+    const paper = await arxivInfo(abstractUrl, options, headers);
+    if (paper) return paper;
+    const name = /^\/pdf\//i.test(new URL(absolute).pathname)
+      ? fileNameFromUrl(absolute)
+      : null;
+    return name ? namedOnly(name) : null;
+  }
+
   // A file is named after its path; downloading it would only tell us that
   // it isn't a page.
   if (isFileUrl(absolute)) {
     const name = fileNameFromUrl(absolute);
     return name ? namedOnly(name) : null;
   }
-
-  const headers: Record<string, string> = {
-    'User-Agent': USER_AGENT,
-    Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
-  };
-  if (options.language) headers['Accept-Language'] = options.language;
 
   const embedded = await oEmbedInfo(absolute, options, headers);
   if (embedded) {
