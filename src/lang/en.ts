@@ -36,7 +36,7 @@ const en = {
     whenHeading: 'When to fetch titles',
     enhancePaste: {
       name: 'Title pasted URLs',
-      desc: 'Fetch the title of a URL pasted with the normal paste command. Pasting with Ctrl/Cmd+Shift+V always leaves the URL as it is.',
+      desc: 'Fetch the title of a URL pasted with the normal paste command. Pasting as plain text (Ctrl/Cmd+Shift+V) always leaves the URL as it is.',
     },
     enhanceDrop: {
       name: 'Title dropped URLs',
@@ -49,10 +49,6 @@ const en = {
     pasteTitleOntoUrl: {
       name: 'Paste text onto a selected URL as its title',
       desc: 'When text is pasted over a selected URL or link, make the text its title instead of replacing the URL.',
-    },
-    skipCodeAndFrontmatter: {
-      name: 'Skip code and frontmatter',
-      desc: 'Leave URLs pasted into code blocks, inline code or frontmatter as they are.',
     },
     titlesHeading: 'Titles',
     removeSiteName: {

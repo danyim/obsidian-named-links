@@ -15,7 +15,7 @@ Paste a URL into Obsidian and get a markdown link titled with the page's name: `
 - **Title URLs already in a note** with the [Add a title to an existing URL](#commands) command.
 - **Undo** gives back the URL as you pasted it; undo again to remove the paste.
 
-The URL is left as pasted when you paste with Ctrl/Cmd+Shift+V, paste with several cursors, paste into code, frontmatter or a link target (`[text](`, `[1]: `, `href="`), or paste an image or an excluded site's URL. If no title can be found, the URL stays and a notice says so.
+The URL is left as pasted when you paste as plain text (Ctrl/Cmd+Shift+V, a system shortcut, not one the plugin adds), paste with several cursors, paste into code, frontmatter or a link target (`[text](`, `[1]: `, `href="`), or paste an image or an excluded site's URL. If no title can be found, the URL stays and a notice says so.
 
 Titles have their line breaks collapsed and markdown characters escaped. A file such as a PDF is named after its path rather than downloaded.
 
@@ -35,11 +35,12 @@ None has a default hotkey; set one under Settings → Hotkeys.
 
 | Setting | Default | |
 | --- | --- | --- |
+| Link format | Markdown link | See [Link format](#link-format). |
+| Decode URLs | Off | Write `%E5%AF%BF` as `寿`. See [Decoding URLs](#decoding-urls). |
 | Title pasted URLs | On | Fetch titles for pasted URLs. |
 | Title dropped URLs | On | Fetch titles for dropped URLs. |
 | Use the selection as the title | On | Pasting a URL over selected text links that text instead of fetching. |
 | Paste text onto a selected URL as its title | Off | Pasting text over a selected URL or link makes the text its title. Works with **Title pasted URLs** off too. |
-| Skip code and frontmatter | On | Leave URLs pasted into code or frontmatter alone. |
 | Remove the site name | Off | `Video - YouTube` becomes `Video`. See [Cleaning up titles](#cleaning-up-titles). |
 | Domain title rules | Empty | Find and replace for one site's titles, run first. |
 | Page title rules | Empty | Find and replace for every title, run second. |
@@ -47,8 +48,6 @@ None has a default hotkey; set one under Settings → Hotkeys.
 | Fetch X posts through FxTwitter | Off | See [Privacy](#privacy). |
 | Excluded sites | Empty | Never fetched. `example.com` covers its subdomains; other text matches any URL containing it. |
 | Paste excluded sites as | The URL as it is | Or a link titled with the domain. |
-| Link format | Markdown link | See [Link format](#link-format). |
-| Decode URLs | Off | Write `%E5%AF%BF` as `寿`. See [Decoding URLs](#decoding-urls). |
 
 ### Link format
 

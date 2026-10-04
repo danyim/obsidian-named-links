@@ -14,8 +14,6 @@ export interface NamedLinksSettings {
   useSelectionAsTitle: boolean;
   /** Pasting text over a selected URL makes it the URL's title. */
   pasteTitleOntoUrl: boolean;
-  /** Leave URLs pasted into code or frontmatter as they are. */
-  skipCodeAndFrontmatter: boolean;
   /** Characters to keep of a fetched title; 0 keeps all of it. */
   maxTitleLength: number;
   /** Drop the site's name from the start or end of a title. */
@@ -41,7 +39,6 @@ export const DEFAULT_SETTINGS: NamedLinksSettings = {
   enhanceDrop: true,
   useSelectionAsTitle: true,
   pasteTitleOntoUrl: false,
-  skipCodeAndFrontmatter: true,
   maxTitleLength: 0,
   removeSiteName: false,
   titleRules: '',

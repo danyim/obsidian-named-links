@@ -125,11 +125,15 @@ export class Linker {
   /**
    * Whether a URL landing at `pos` should be inserted untouched because of
    * where it is going: into code, frontmatter, or an existing link's target.
+   *
+   * Not configurable. No one upstream asked for links in code, and a link in
+   * frontmatter is only ever written in source mode, as unquoted YAML that
+   * breaks the note's properties: a paste into a Properties field never
+   * reaches the plugin at all.
    */
   isRawContext(editor: Editor, pos: EditorPosition): boolean {
     const lineBefore = editor.getLine(pos.line).slice(0, pos.ch);
     if (isLinkTargetPosition(lineBefore)) return true;
-    if (!this.settings.skipCodeAndFrontmatter) return false;
     const text = editor.getValue();
     const offset = editor.posToOffset(pos);
     return isInFrontmatter(text, offset) || isInCode(text, offset);

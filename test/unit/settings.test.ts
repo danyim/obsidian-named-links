@@ -64,6 +64,13 @@ describe('mergeSettings', () => {
     assert.deepEqual(merged, { ...DEFAULT_SETTINGS, enhancePaste: false });
   });
 
+  it('drops settings that no longer exist', () => {
+    // "Skip code and frontmatter" was a toggle before code and frontmatter
+    // were always skipped.
+    const merged = mergeSettings({ skipCodeAndFrontmatter: false });
+    assert.equal('skipCodeAndFrontmatter' in merged, false);
+  });
+
   it('survives no stored data', () => {
     assert.deepEqual(mergeSettings(null), DEFAULT_SETTINGS);
   });

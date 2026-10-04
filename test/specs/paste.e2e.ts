@@ -254,13 +254,64 @@ describe('Pasting a URL', function () {
       });
     }
 
-    it('titles code and frontmatter pastes once skipping is off', async function () {
-      await setSettings({ skipCodeAndFrontmatter: false });
-      await openNote('```\n‸\n```');
-      const url = `${base}/page?title=Coded`;
-      await paste(url);
+    it('still skips code where the removed setting was saved as off', async function () {
+      // "Skip code and frontmatter" used to be a setting. A vault that had
+      // turned it off keeps the key in data.json, and it has to be ignored.
+      await browser.executeObsidian(async ({ app }) => {
+        const p = (app as any).plugins.plugins['named-links'];
+        await p.saveData({ ...p.settings, skipCodeAndFrontmatter: false });
+        await p.loadSettings();
+      });
+      await openNote('```\n‸\n```', { source: true });
+      await paste(`${base}/page`);
+      expect(await editorValue()).toBe(`\`\`\`\n${base}/page\n\`\`\``);
+      expect(requestLog()).toEqual([]);
+    });
+  });
+
+  it('titles a menu paste made just after a plain paste', async function () {
+    // Choosing Paste from the context menu brings no keystroke to end the
+    // plain paste before it, but the click that opens the menu does.
+    await openNote('‸');
+    await paste(`${base}/page?title=Plain`, { plain: true });
+    await browser.executeObsidian(() => {
+      document.body.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true })
+      );
+    });
+    const url = `${base}/page?title=Menu`;
+    await paste(` ${url}`, { viaKeyboard: false });
+    await settled();
+    expect(await editorValue()).toBe(`${base}/page?title=Plain [Menu](${url})`);
+  });
+
+  // Real keystrokes through WebDriver, with the URL on the real clipboard,
+  // rather than synthetic events: what Obsidian does with each shortcut is
+  // the thing under test.
+  describe('with real keystrokes', function () {
+    async function pressWithClipboard(text: string, keys: string[]) {
+      await browser.executeObsidian(async (_, text) => {
+        await navigator.clipboard.writeText(text);
+      }, text);
+      await browser.keys(keys);
+      await browser.pause(300);
       await settled();
-      expect(await editorValue()).toBe(`\`\`\`\n[Coded](${url})\n\`\`\``);
+    }
+
+    it('titles a URL pasted with Ctrl+V', async function () {
+      await openNote('‸');
+      const url = `${base}/page?title=Keyed`;
+      await pressWithClipboard(url, ['Control', 'v']);
+      expect(await editorValue()).toBe(`[Keyed](${url})`);
+    });
+
+    it('leaves every paste from Ctrl+Shift+V alone', async function () {
+      // Obsidian fires two paste events for one Ctrl+Shift+V; neither may be
+      // titled, whatever Obsidian itself inserts for them.
+      await openNote('‸');
+      await pressWithClipboard(`${base}/page`, ['Control', 'Shift', 'v']);
+      expect(await editorValue()).not.toContain('](');
+      expect(requestLog()).toEqual([]);
     });
   });
 
