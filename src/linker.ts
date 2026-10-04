@@ -54,11 +54,16 @@ interface PendingTitle {
   /** What goes back in place of the placeholder if no title is found. */
   fallback: string;
   /**
-   * A title already known (a selection used as the title), when the lookup
-   * is only for the format's other placeholders. It's markdown of the user's
-   * own, kept as it is.
+   * A title already known, when the lookup is only for the format's other
+   * placeholders: a selection used as the title, or the link text a paste
+   * carried.
    */
   knownTitle?: string;
+  /**
+   * Whether `knownTitle` is the user's own markdown, kept as it is (a
+   * selection), rather than text from a page, escaped like a fetched title.
+   */
+  knownTitleIsMarkdown?: boolean;
 }
 
 export interface InsertPlan {
@@ -217,7 +222,13 @@ export class Linker {
       return {
         text: `[${placeholder}](${linkDestination(url)})`,
         pending: [
-          { placeholder, url, fallback: withSelection, knownTitle: selection },
+          {
+            placeholder,
+            url,
+            fallback: withSelection,
+            knownTitle: selection,
+            knownTitleIsMarkdown: true,
+          },
         ],
       };
     }
@@ -239,10 +250,22 @@ export class Linker {
       // unfetched.
       if (!this.wantsPageInfo) return this.link(url, '');
       if (copiedTitle && urls.length === 1) {
-        return this.link(
+        const title = readableTitle(copiedTitle, this.settings.maxTitleLength);
+        const withCopied = this.link(url, title);
+        // As with a selection: the copied text is the title, and a lookup
+        // only happens for the format's other placeholders.
+        if (pageFieldsIn(templateFor(this.settings)).length === 0) {
+          return withCopied;
+        }
+        const placeholder = newPlaceholder();
+        pending.push({
+          placeholder,
           url,
-          readableTitle(copiedTitle, this.settings.maxTitleLength)
-        );
+          fallback: withCopied,
+          knownTitle: title,
+          knownTitleIsMarkdown: false,
+        });
+        return `[${placeholder}](${linkDestination(url)})`;
       }
       const placeholder = newPlaceholder();
       pending.push({ placeholder, url, fallback: token });
@@ -388,7 +411,12 @@ export class Linker {
 
     const replacement = (destination: string) =>
       item.knownTitle !== undefined
-        ? this.link(stripAngles(destination), item.knownTitle, true, page)
+        ? this.link(
+            stripAngles(destination),
+            item.knownTitle,
+            item.knownTitleIsMarkdown ?? false,
+            page
+          )
         : title === null
           ? item.fallback
           : this.link(

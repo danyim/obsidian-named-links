@@ -111,6 +111,35 @@ describe('Using the title a link was copied with', function () {
     expect(requestLog()).toEqual([]);
   });
 
+  it("keeps the copied title and fills the format's other page fields", async function () {
+    // The copied text is the title; the page is read only for {author}.
+    await setSettings({
+      linkFormat: 'custom',
+      customLinkFormat: '[{title} by {author}]({url})',
+    });
+    const url = `${base}/about`;
+    await openNote('‸');
+    await pasteWith(url, { 'text/html': anchorHtml(url, 'Copied title') });
+    await settled();
+    expect(await editorValue()).toBe(`[Copied title by Ada Lovelace](${url})`);
+  });
+
+  it('escapes a copied title like a fetched one', async function () {
+    await setSettings({
+      linkFormat: 'custom',
+      customLinkFormat: '[{title} by {author}]({url})',
+    });
+    const url = `${base}/about`;
+    await openNote('‸');
+    await pasteWith(url, {
+      'text/html': anchorHtml(url, 'A [bracketed] title'),
+    });
+    await settled();
+    expect(await editorValue()).toBe(
+      `[A \\[bracketed\\] title by Ada Lovelace](${url})`
+    );
+  });
+
   it("uses Firefox's title on a dropped link", async function () {
     const url = `${base}/page?title=Fetched`;
     await openNote('Drop: ‸');
