@@ -12,12 +12,20 @@ import {
   MarkdownView,
   Notice,
   TFile,
+  moment,
 } from 'obsidian';
 
 import { isInCode, isInFrontmatter, isLinkTargetPosition } from './context';
 import { changeTracked, finishPlaceholder, insertTracked } from './history';
 import { t } from './lang';
-import { needsTitle, renderLink, templateFor } from './linkFormat';
+import {
+  needsPageInfo,
+  needsTitle,
+  pageFieldsIn,
+  renderLink,
+  templateFor,
+} from './linkFormat';
+import type { PageInfo } from './scraper';
 import { NamedLinksSettings, isExcluded, parseExcludedSites } from './settings';
 import { readableTitle } from './title';
 import {
@@ -32,12 +40,12 @@ import {
   unwrapAutolink,
 } from './url';
 
-export type TitleFetcher = (url: string) => Promise<string | null>;
+export type PageInfoFetcher = (url: string) => Promise<PageInfo | null>;
 
 export interface LinkerHost {
   app: App;
   settings: NamedLinksSettings;
-  fetchTitle: TitleFetcher;
+  fetchPageInfo: PageInfoFetcher;
 }
 
 interface PendingTitle {
@@ -45,6 +53,17 @@ interface PendingTitle {
   url: string;
   /** What goes back in place of the placeholder if no title is found. */
   fallback: string;
+  /**
+   * A title already known, when the lookup is only for the format's other
+   * placeholders: a selection used as the title, or the link text a paste
+   * carried.
+   */
+  knownTitle?: string;
+  /**
+   * Whether `knownTitle` is the user's own markdown, kept as it is (a
+   * selection), rather than text from a page, escaped like a fetched title.
+   */
+  knownTitleIsMarkdown?: boolean;
 }
 
 export interface InsertPlan {
@@ -109,17 +128,36 @@ export class Linker {
    * finished link goes through here; the request and the fallback for a
    * missing title use the URL as it came.
    */
-  link(url: string, title: string, titleIsMarkdown = false): string {
+  link(
+    url: string,
+    title: string,
+    titleIsMarkdown = false,
+    page: PageInfo | null = null
+  ): string {
     return renderLink(templateFor(this.settings), {
       url: this.settings.decodeUrls ? decodeUrlForDisplay(url) : url,
       title,
       titleIsMarkdown,
+      author: page?.author,
+      site: page?.siteName,
+      description: page?.description,
+      section: page?.section,
+      formatDate: (format) => moment().format(format),
     });
   }
 
-  /** Whether the link format shows a title, and so whether to fetch one. */
+  /** Whether the link format shows a title. */
   get wantsTitle(): boolean {
     return needsTitle(templateFor(this.settings));
+  }
+
+  /**
+   * Whether the link format shows anything read from the page, and so
+   * whether to fetch it. A format of only `{url}`, `{domain}` and `{date}`
+   * is written straight away.
+   */
+  get wantsPageInfo(): boolean {
+    return needsPageInfo(templateFor(this.settings));
   }
 
   /**
@@ -173,7 +211,26 @@ export class Linker {
       !selection.includes('\n')
     ) {
       const url = toAbsoluteUrl(unwrapAutolink(urls[0])) as string;
-      return { text: this.link(url, selection, true), pending: [] };
+      // The selection is the title, but a format that also shows the
+      // author, site, description or section still needs the page for
+      // those. Without it, the link with only the selection is final.
+      const withSelection = this.link(url, selection, true);
+      if (pageFieldsIn(templateFor(this.settings)).length === 0) {
+        return { text: withSelection, pending: [] };
+      }
+      const placeholder = newPlaceholder();
+      return {
+        text: `[${placeholder}](${linkDestination(url)})`,
+        pending: [
+          {
+            placeholder,
+            url,
+            fallback: withSelection,
+            knownTitle: selection,
+            knownTitleIsMarkdown: true,
+          },
+        ],
+      };
     }
 
     const excluded = parseExcludedSites(this.settings.excludedSites);
@@ -189,13 +246,26 @@ export class Linker {
           ? this.link(url, hostnameOf(url))
           : token;
       }
-      // A format without the title is finished straight away, unfetched.
-      if (!this.wantsTitle) return this.link(url, '');
+      // A format showing nothing from the page is finished straight away,
+      // unfetched.
+      if (!this.wantsPageInfo) return this.link(url, '');
       if (copiedTitle && urls.length === 1) {
-        return this.link(
+        const title = readableTitle(copiedTitle, this.settings.maxTitleLength);
+        const withCopied = this.link(url, title);
+        // As with a selection: the copied text is the title, and a lookup
+        // only happens for the format's other placeholders.
+        if (pageFieldsIn(templateFor(this.settings)).length === 0) {
+          return withCopied;
+        }
+        const placeholder = newPlaceholder();
+        pending.push({
+          placeholder,
           url,
-          readableTitle(copiedTitle, this.settings.maxTitleLength)
-        );
+          fallback: withCopied,
+          knownTitle: title,
+          knownTitleIsMarkdown: false,
+        });
+        return `[${placeholder}](${linkDestination(url)})`;
       }
       const placeholder = newPlaceholder();
       pending.push({ placeholder, url, fallback: token });
@@ -324,24 +394,37 @@ export class Linker {
     file: TFile | null,
     item: PendingTitle
   ): Promise<void> {
-    let title: string | null = null;
+    let page: PageInfo | null = null;
     try {
-      title = await this.host.fetchTitle(item.url);
+      page = await this.host.fetchPageInfo(item.url);
     } catch (e) {
       console.error('Named Links: fetching a title failed', e);
     }
+    const title = page?.title ?? null;
 
-    if (title === null) {
+    // A known title still makes a link when the page can't be read: the
+    // fallback is that link with the page's fields empty, so there is
+    // nothing to tell the user.
+    if (title === null && item.knownTitle === undefined) {
       new Notice(t().notices.noTitle(hostnameOf(item.url)));
     }
 
     const replacement = (destination: string) =>
-      title === null
-        ? item.fallback
-        : this.link(
+      item.knownTitle !== undefined
+        ? this.link(
             stripAngles(destination),
-            readableTitle(title, this.settings.maxTitleLength)
-          );
+            item.knownTitle,
+            item.knownTitleIsMarkdown ?? false,
+            page
+          )
+        : title === null
+          ? item.fallback
+          : this.link(
+              stripAngles(destination),
+              readableTitle(title, this.settings.maxTitleLength),
+              false,
+              page
+            );
 
     // The editor that took the paste, if it is still on screen, then any
     // other editor showing the note. A closed editor's document can still
@@ -412,7 +495,7 @@ export class Linker {
 
     const from = { line: cursor.line, ch: link.start };
     const to = { line: cursor.line, ch: link.end };
-    if (!this.wantsTitle) {
+    if (!this.wantsPageInfo) {
       editor.replaceRange(this.link(url, ''), from, to);
       return;
     }
@@ -463,7 +546,7 @@ export class Linker {
           from: { line: ln, ch: link.start },
           to: { line: ln, ch: link.end },
         };
-        if (!this.wantsTitle) {
+        if (!this.wantsPageInfo) {
           changes.push({ ...range, text: this.link(url, '') });
           continue;
         }

@@ -1,5 +1,6 @@
 /**
- * Finds a page's title from its HTML, without running any of the page.
+ * Finds a page's title, and what else a link format can show about it, from
+ * its HTML, without running any of the page.
  *
  * Upstream loaded the page in a hidden Electron BrowserWindow with
  * nodeIntegration on and webSecurity off, which handed every pasted site's
@@ -28,18 +29,41 @@ export interface HttpResponse {
 
 export type HttpClient = (request: HttpRequest) => Promise<HttpResponse>;
 
+export interface OEmbedProvider {
+  pattern: RegExp;
+  endpoint: string;
+}
+
 export interface FetchTitleOptions {
   http: HttpClient;
   /** Sent as Accept-Language so sites answer in the user's language. */
   language?: string;
   /** Look X posts up through FxTwitter instead of x.com. */
   twitterProxy?: boolean;
+  /** Replaces the built-in oEmbed providers; the e2e suite points it locally. */
+  oEmbedProviders?: OEmbedProvider[];
   /**
-   * Told the site's name when the page or oEmbed response declares one, for
-   * removing it from the title. A callback so the title's own return type,
-   * and everything that passes it along, stays a string.
+   * The page fields the link format shows besides the title. When oEmbed
+   * answers without one of them, the page itself is read for it too.
    */
-  onSiteName?: (siteName: string) => void;
+  fields?: readonly ('author' | 'site' | 'description' | 'section')[];
+}
+
+/**
+ * What a page says about itself. Only the title is required; a page without
+ * one counts as no answer at all. The rest feed the link format's other
+ * placeholders and the title clean-up, and are null when the page is silent.
+ */
+export interface PageInfo {
+  title: string;
+  /** `og:site_name`, `application-name`, or oEmbed's `provider_name`. */
+  siteName: string | null;
+  /** oEmbed's `author_name` (a video's channel), or the author meta tags. */
+  author: string | null;
+  /** The Open Graph, standard or Twitter description. */
+  description: string | null;
+  /** The text of the heading the URL's `#fragment` points at. */
+  section: string | null;
 }
 
 // Some sites refuse requests that don't look like a browser (upstream #171).
@@ -56,11 +80,6 @@ const CHALLENGE_TITLES = [
   /^access denied$/i,
   /^ddos-guard$/i,
 ];
-
-interface OEmbedProvider {
-  pattern: RegExp;
-  endpoint: string;
-}
 
 // Sites whose HTML title is missing or generic without JavaScript, but that
 // publish the real one through oEmbed.
@@ -176,34 +195,182 @@ function usable(title: string | null | undefined): string | null {
   return cleaned;
 }
 
-/**
- * The best title in an HTML document: its <title>, then Open Graph, then
- * Twitter card metadata. `preferOpenGraph` puts Open Graph first, for pages
- * made for link previews whose <title> is generic.
- */
-export function extractTitle(
-  html: string,
-  preferOpenGraph = false
-): string | null {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+/** Whitespace collapsed, or null if nothing is left. */
+function text(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const cleaned = cleanTitle(value);
+  return cleaned === '' ? null : cleaned;
+}
 
+function parseHtml(html: string): Document {
+  return new DOMParser().parseFromString(html, 'text/html');
+}
+
+function metaContent(doc: Document, selector: string): string | null {
+  return doc.querySelector(selector)?.getAttribute('content') ?? null;
+}
+
+function titleOf(doc: Document, preferOpenGraph: boolean): string | null {
   // An inline <svg> can carry its own <title> ahead of or instead of the
   // document's.
   const titleEl = Array.from(doc.querySelectorAll('title')).find(
     (el) => !el.closest('svg')
   );
-  const meta = (selector: string) =>
-    doc.querySelector(selector)?.getAttribute('content');
-
   const documentTitle = preferOpenGraph ? null : usable(titleEl?.textContent);
   return (
     documentTitle ??
-    usable(meta('meta[property="og:title"]')) ??
-    usable(meta('meta[name="og:title"]')) ??
-    usable(meta('meta[name="twitter:title"]')) ??
-    usable(meta('meta[property="twitter:title"]')) ??
+    usable(metaContent(doc, 'meta[property="og:title"]')) ??
+    usable(metaContent(doc, 'meta[name="og:title"]')) ??
+    usable(metaContent(doc, 'meta[name="twitter:title"]')) ??
+    usable(metaContent(doc, 'meta[property="twitter:title"]')) ??
     usable(titleEl?.textContent)
   );
+}
+
+function siteNameOf(doc: Document): string | null {
+  return (
+    usable(metaContent(doc, 'meta[property="og:site_name"]')) ??
+    usable(metaContent(doc, 'meta[name="og:site_name"]')) ??
+    usable(metaContent(doc, 'meta[name="application-name"]'))
+  );
+}
+
+function authorOf(doc: Document): string | null {
+  // article:author is often a profile URL rather than a name, which would
+  // read badly as text.
+  const article = text(metaContent(doc, 'meta[property="article:author"]'));
+  return (
+    text(metaContent(doc, 'meta[name="author"]')) ??
+    (article && !/^https?:\/\//i.test(article) ? article : null)
+  );
+}
+
+function descriptionOf(doc: Document): string | null {
+  return (
+    text(metaContent(doc, 'meta[property="og:description"]')) ??
+    text(metaContent(doc, 'meta[name="description"]')) ??
+    text(metaContent(doc, 'meta[name="twitter:description"]')) ??
+    text(metaContent(doc, 'meta[property="twitter:description"]'))
+  );
+}
+
+const HEADING = 'h1, h2, h3, h4, h5, h6';
+
+// What a fragment may be written as: raw, percent-decoded, and with `+` for a
+// space, as Obsidian Publish writes them (upstream #130).
+function fragmentForms(fragment: string): string[] {
+  const forms = [fragment];
+  try {
+    forms.push(decodeURIComponent(fragment));
+  } catch {
+    // A stray % leaves only the raw form.
+  }
+  for (const form of [...forms]) forms.push(form.replace(/\+/g, ' '));
+  return [...new Set(forms)];
+}
+
+// Fragments made from heading text: case, spaces, `+`, `-` and `_` don't
+// matter.
+function looseKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\s+_-]+/g, ' ')
+    .trim();
+}
+
+// Permalink markers sites put next to a heading's text.
+const PERMALINK_MARKS = /^[#¶§🔗\s]+|[#¶§🔗\s]+$/gu;
+
+function headingText(el: Element): string | null {
+  const cleaned = text(el.textContent);
+  if (!cleaned) return null;
+  return text(cleaned.replace(PERMALINK_MARKS, ''));
+}
+
+// A target that isn't a heading only names its section if it is this short.
+const MAX_SECTION_LENGTH = 120;
+
+/**
+ * The text of the heading a URL's `#fragment` points at (upstream #130): the
+ * element whose `id`, or an `<a name>`, matches the fragment, and the heading
+ * it is, sits in, holds, or comes right before. Pages whose headings carry no
+ * id in their HTML are matched on the heading's own text instead.
+ */
+function sectionOf(doc: Document, fragment: string): string | null {
+  if (!fragment) return null;
+  const forms = fragmentForms(fragment);
+
+  let target: Element | null = null;
+  for (const form of forms) {
+    target =
+      doc.getElementById(form) ??
+      Array.from(doc.querySelectorAll('a[name]')).find(
+        (a) => a.getAttribute('name') === form
+      ) ??
+      null;
+    if (target) break;
+  }
+
+  if (target) {
+    const next = target.nextElementSibling;
+    const heading =
+      (target.matches(HEADING) ? target : null) ??
+      target.closest(HEADING) ??
+      target.querySelector(HEADING) ??
+      (next && next.matches(HEADING) ? next : null);
+    if (heading) return headingText(heading);
+    const own = headingText(target);
+    return own && own.length <= MAX_SECTION_LENGTH ? own : null;
+  }
+
+  const keys = new Set(forms.map(looseKey));
+  const byText = Array.from(doc.querySelectorAll(HEADING)).find((h) => {
+    const value = headingText(h);
+    return value !== null && keys.has(looseKey(value));
+  });
+  return byText ? headingText(byText) : null;
+}
+
+function fragmentOf(url: string): string {
+  try {
+    return new URL(url).hash.replace(/^#/, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Everything an HTML document says about itself, or null if it has no title.
+ * `url` supplies the `#fragment` for the section. `preferOpenGraph` puts Open
+ * Graph's title first, for pages made for link previews whose <title> is
+ * generic.
+ */
+export function extractPageInfo(
+  html: string,
+  url = '',
+  preferOpenGraph = false
+): PageInfo | null {
+  const doc = parseHtml(html);
+  const title = titleOf(doc, preferOpenGraph);
+  if (!title) return null;
+  return {
+    title,
+    siteName: siteNameOf(doc),
+    author: authorOf(doc),
+    description: descriptionOf(doc),
+    section: sectionOf(doc, fragmentOf(url)),
+  };
+}
+
+/**
+ * The best title in an HTML document: its <title>, then Open Graph, then
+ * Twitter card metadata.
+ */
+export function extractTitle(
+  html: string,
+  preferOpenGraph = false
+): string | null {
+  return titleOf(parseHtml(html), preferOpenGraph);
 }
 
 /**
@@ -211,14 +378,23 @@ export function extractTitle(
  * else the `application-name` meta tag.
  */
 export function extractSiteName(html: string): string | null {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const meta = (selector: string) =>
-    doc.querySelector(selector)?.getAttribute('content');
-  return (
-    usable(meta('meta[property="og:site_name"]')) ??
-    usable(meta('meta[name="og:site_name"]')) ??
-    usable(meta('meta[name="application-name"]'))
-  );
+  return siteNameOf(parseHtml(html));
+}
+
+/** The text of the heading `fragment` points at in an HTML document. */
+export function extractSection(html: string, fragment: string): string | null {
+  return sectionOf(parseHtml(html), fragment);
+}
+
+/** A page known only by a name, such as a file's. */
+function namedOnly(title: string): PageInfo {
+  return {
+    title,
+    siteName: null,
+    author: null,
+    description: null,
+    section: null,
+  };
 }
 
 async function tryRequest(
@@ -232,12 +408,13 @@ async function tryRequest(
   }
 }
 
-async function oEmbedTitle(
+async function oEmbedInfo(
   url: string,
   options: FetchTitleOptions,
   headers: Record<string, string>
-): Promise<string | null> {
-  const provider = OEMBED_PROVIDERS.find((p) => p.pattern.test(url));
+): Promise<PageInfo | null> {
+  const providers = options.oEmbedProviders ?? OEMBED_PROVIDERS;
+  const provider = providers.find((p) => p.pattern.test(url));
   if (!provider) return null;
 
   const res = await tryRequest(options.http, {
@@ -248,17 +425,22 @@ async function oEmbedTitle(
   if (!res || res.status >= 400) return null;
 
   try {
-    const data = JSON.parse(new TextDecoder('utf-8').decode(res.body())) as {
-      title?: unknown;
-      provider_name?: unknown;
+    const data = JSON.parse(
+      new TextDecoder('utf-8').decode(res.body())
+    ) as Record<string, unknown>;
+    const field = (key: string) => {
+      const value = data[key];
+      return typeof value === 'string' ? value : null;
     };
-    const title = typeof data.title === 'string' ? usable(data.title) : null;
-    const provider =
-      typeof data.provider_name === 'string'
-        ? usable(data.provider_name)
-        : null;
-    if (title && provider) options.onSiteName?.(provider);
-    return title;
+    const title = usable(field('title'));
+    if (!title) return null;
+    return {
+      title,
+      siteName: usable(field('provider_name')),
+      author: text(field('author_name')),
+      description: text(field('description')),
+      section: null,
+    };
   } catch {
     return null;
   }
@@ -272,12 +454,27 @@ export async function fetchTitle(
   url: string,
   options: FetchTitleOptions
 ): Promise<string | null> {
+  return (await fetchPageInfo(url, options))?.title ?? null;
+}
+
+/**
+ * What the page at a URL says about itself, or null when no title could be
+ * found: the site is unreachable, answered with an error, or its page has no
+ * title.
+ */
+export async function fetchPageInfo(
+  url: string,
+  options: FetchTitleOptions
+): Promise<PageInfo | null> {
   const absolute = toAbsoluteUrl(url);
   if (!absolute) return null;
 
   // A file is named after its path; downloading it would only tell us that
   // it isn't a page.
-  if (isFileUrl(absolute)) return fileNameFromUrl(absolute);
+  if (isFileUrl(absolute)) {
+    const name = fileNameFromUrl(absolute);
+    return name ? namedOnly(name) : null;
+  }
 
   const headers: Record<string, string> = {
     'User-Agent': USER_AGENT,
@@ -285,9 +482,46 @@ export async function fetchTitle(
   };
   if (options.language) headers['Accept-Language'] = options.language;
 
-  const embedded = await oEmbedTitle(absolute, options, headers);
-  if (embedded) return embedded;
+  const embedded = await oEmbedInfo(absolute, options, headers);
+  if (embedded) {
+    // oEmbed gives a title and often an author, but rarely a description,
+    // and never the heading a fragment points at. Read the page as well
+    // when the link format shows one of those and oEmbed left it out.
+    const missing = (options.fields ?? []).some(
+      (field) => embedded[FIELD_KEYS[field]] === null
+    );
+    if (!missing) return embedded;
+    const page = await pageInfoFromHtml(absolute, options, headers);
+    return page ? mergePageInfo(embedded, page) : embedded;
+  }
 
+  return pageInfoFromHtml(absolute, options, headers);
+}
+
+const FIELD_KEYS = {
+  author: 'author',
+  site: 'siteName',
+  description: 'description',
+  section: 'section',
+} as const;
+
+/** `primary`'s values, with `fallback` filling the ones it lacks. */
+function mergePageInfo(primary: PageInfo, fallback: PageInfo): PageInfo {
+  return {
+    title: primary.title,
+    siteName: primary.siteName ?? fallback.siteName,
+    author: primary.author ?? fallback.author,
+    description: primary.description ?? fallback.description,
+    section: primary.section ?? fallback.section,
+  };
+}
+
+/** What the page at `absolute` says about itself, read from its HTML. */
+async function pageInfoFromHtml(
+  absolute: string,
+  options: FetchTitleOptions,
+  headers: Record<string, string>
+): Promise<PageInfo | null> {
   const mirror = options.twitterProxy ? twitterProxyUrl(absolute) : null;
   if (mirror) {
     const res = await tryRequest(options.http, {
@@ -296,8 +530,9 @@ export async function fetchTitle(
       headers: { ...headers, 'User-Agent': LINK_PREVIEW_USER_AGENT },
     });
     if (!res || res.status >= 400) return null;
-    return extractTitle(
+    return extractPageInfo(
       decodeHtml(res.body(), header(res, 'content-type')),
+      absolute,
       true
     );
   }
@@ -312,7 +547,7 @@ export async function fetchTitle(
     headers,
   });
   if (head && head.status < 400 && !isHtml(header(head, 'content-type'))) {
-    return fileNameFromUrl(absolute) ?? hostnameOf(absolute);
+    return namedOnly(fileNameFromUrl(absolute) ?? hostnameOf(absolute));
   }
 
   const res = await tryRequest(options.http, {
@@ -324,13 +559,8 @@ export async function fetchTitle(
 
   const contentType = header(res, 'content-type');
   if (!isHtml(contentType)) {
-    return fileNameFromUrl(absolute) ?? hostnameOf(absolute);
+    return namedOnly(fileNameFromUrl(absolute) ?? hostnameOf(absolute));
   }
 
-  const html = decodeHtml(res.body(), contentType);
-  if (options.onSiteName) {
-    const siteName = extractSiteName(html);
-    if (siteName) options.onSiteName(siteName);
-  }
-  return extractTitle(html);
+  return extractPageInfo(decodeHtml(res.body(), contentType), absolute);
 }

@@ -15,7 +15,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `main.ts` | Plugin entry point: loads settings, registers the paste and drop handlers and the commands, and watches for Mod+Shift+V. |
 | `linker.ts` | Decides what a paste or drop inserts, puts placeholders in, and swaps each for its title (in the editor, or in the file if the editor has moved on). |
 | `history.ts` | Keeps a titled paste to two undo steps, the URL as pasted and then the title, with no placeholder in between. The paste goes in as an isolated history event, and each arriving title rewrites the plugin's own events on top of the history when the note hasn't changed since. |
-| `scraper.ts` | Finds a title for a URL: oEmbed, a HEAD request to spot files, then the page's HTML. No Obsidian imports, so it is unit tested under Node. |
+| `scraper.ts` | Finds what a URL's page says about itself (title, site, author, description, and the section its `#fragment` points to): oEmbed, a HEAD request to spot files, then the page's HTML. No Obsidian imports, so it is unit tested under Node. |
 | `http.ts` | The scraper's HTTP client: Obsidian's `requestUrl` with a timeout. |
 | `url.ts` | Recognizes URLs and finds links and bare URLs on a line. |
 | `title.ts` | Cleans, shortens and escapes a title for use as link text. |
@@ -24,7 +24,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `clipboardTitle.ts` | Reads the title a pasted or dropped link already carries (copied HTML, Firefox's `text/x-moz-url`) and decides whether it beats fetching one. |
 | `context.ts` | Tells whether a position is in code, frontmatter or a link target. |
 | `settings.ts` | The settings shape and defaults, excluded-site matching, and the Auto Link Title import. |
-| `linkFormat.ts` | Renders a finished link from the link format template, escaping each placeholder for the part of the template it sits in, and validates custom templates. |
+| `linkFormat.ts` | Renders a finished link from the link format template, escaping each placeholder for the part of the template it sits in and tidying around values the page didn't have, and validates custom templates. The date is formatted by a function the linker passes in (Obsidian's moment), so this module stays free of Obsidian imports. |
 | `settingsTab.ts` | The settings tab, through `getSettingDefinitions()`. |
 | `vim.ts` | Notices vim's `p` and `P` putting text into an editor, which they do without a paste event, so the URLs they put can be titled. |
 | `lang/` | UI strings: `en.ts` defines them, `ja.ts` translates them, `index.ts` picks one by Obsidian's language. |

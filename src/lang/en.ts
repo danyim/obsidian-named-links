@@ -99,7 +99,7 @@ const en = {
     },
     customLinkFormat: {
       name: 'Custom format',
-      desc: 'Use {title}, {url} and {domain}. Leave out {title} and no title is fetched.',
+      desc: 'Use {title}, {url}, {domain}, {author}, {site}, {description}, {section} (the heading a #link points to) and {date} or {date:YYYY-MM-DD}. A missing value is left out along with the separator next to it. Use only {url}, {domain} and {date} and nothing is fetched.',
     },
     decodeUrls: {
       name: 'Decode URLs',
@@ -108,9 +108,11 @@ const en = {
     templateErrors: {
       missingUrl: 'The format needs {url}.',
       unknownPlaceholder: (name: string) =>
-        `{${name}} isn't a placeholder. Use {title}, {url} or {domain}.`,
+        `{${name}} isn't a placeholder. Use {title}, {url}, {domain}, {author}, {site}, {description}, {section} or {date}.`,
       unquotedInTag: (name: string) =>
         `Put {${name}} inside a quoted attribute value, such as href="{${name}}".`,
+      emptyDateFormat:
+        'Give {date:} a format after the colon, such as {date:YYYY-MM-DD}, or use {date}.',
     },
   },
 };

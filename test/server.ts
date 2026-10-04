@@ -110,6 +110,39 @@ function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return html(
         '<html><head><title>FxTwitter</title><meta property="og:title" content="Someone (@someone)"></head></html>'
       );
+    case '/about':
+      // A page that says everything about itself, for the link format's
+      // page placeholders. ?bare=1 leaves out the author.
+      return html(
+        `<!doctype html><html><head><title>About page</title>
+        <meta property="og:site_name" content="Fixture Site">
+        ${url.searchParams.has('bare') ? '' : '<meta name="author" content="Ada Lovelace">'}
+        <meta property="og:description" content="What this page is about">
+        </head><body>
+        <h1>About page</h1>
+        <h2 id="usage">Usage</h2><p>How to use it.</p>
+        <h2>Link to a heading in a note</h2><p>No id on this one.</p>
+        </body></html>`
+      );
+    case '/video':
+      // Stands in for a video site whose page title says nothing useful;
+      // its oEmbed endpoint below has the real title and channel, but no
+      // description, which only the page has.
+      return html(
+        `<!doctype html><html><head><title>Video site</title>
+        <meta property="og:description" content="What the video is about">
+        </head><body></body></html>`
+      );
+    case '/oembed': {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(
+        JSON.stringify({
+          title: 'A video',
+          author_name: 'A Channel',
+          provider_name: 'Fixture Video',
+        })
+      );
+    }
     default:
       // Any path under /word/, such as a percent-encoded one, is a page
       // titled with its last segment decoded, for the URL decoding specs.

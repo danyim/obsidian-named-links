@@ -4,7 +4,10 @@ import {
   DEFAULT_TEMPLATE,
   LINK_FORMATS,
   escapeHtml,
+  localIsoDate,
+  needsPageInfo,
   needsTitle,
+  pageFieldsIn,
   renderLink,
   templateFor,
   validateTemplate,
@@ -229,6 +232,174 @@ describe('validateTemplate', () => {
       name: 'url',
     });
   });
+
+  it('accepts every page placeholder and a dated one', () => {
+    assert.equal(
+      validateTemplate(
+        '[{title} - {author} | {site} §{section}]({url} "{description}") {date} {date:YYYY-MM-DD HH:mm}'
+      ),
+      null
+    );
+  });
+
+  it('rejects {date:} with an empty format', () => {
+    assert.deepEqual(validateTemplate('[{title}]({url}) {date:}'), {
+      code: 'emptyDateFormat',
+    });
+    assert.deepEqual(validateTemplate('[{title}]({url}) {date:  }'), {
+      code: 'emptyDateFormat',
+    });
+  });
+
+  it('rejects a format on anything but {date}', () => {
+    assert.deepEqual(validateTemplate('[{title:upper}]({url})'), {
+      code: 'unknownPlaceholder',
+      name: 'title:upper',
+    });
+  });
+});
+
+describe('needsPageInfo', () => {
+  it('is true for any placeholder read from the page', () => {
+    for (const name of ['title', 'author', 'site', 'description', 'section']) {
+      assert.equal(needsPageInfo(`[x {${name}}]({url})`), true, name);
+    }
+  });
+
+  it('is false for the URL, the domain and the date', () => {
+    assert.equal(needsPageInfo('[{domain} {date}]({url})'), false);
+    assert.equal(needsPageInfo('[{date:MMM D}]({url})'), false);
+  });
+});
+
+describe('the page placeholders', () => {
+  const values = {
+    title: 'Title',
+    url: 'https://example.com/a',
+    author: 'Ada',
+    site: 'Example',
+    description: 'About it',
+    section: 'Usage',
+  };
+
+  it('fills in each one', () => {
+    assert.equal(
+      renderLink(
+        '[{title} by {author} on {site}, §{section}: {description}]({url})',
+        values
+      ),
+      '[Title by Ada on Example, §Usage: About it](https://example.com/a)'
+    );
+  });
+
+  it('escapes each one for where it sits, like the title', () => {
+    const hostile = { ...values, author: '*Ada* [x]', description: 'say "hi"' };
+    assert.equal(
+      renderLink('[{author}]({url} "{description}")', hostile),
+      '[\\*Ada\\* \\[x\\]](https://example.com/a "say \\"hi\\"")'
+    );
+    assert.equal(
+      renderLink('<a href="{url}" title="{description}">{author}</a>', hostile),
+      '<a href="https://example.com/a" title="say &quot;hi&quot;">\\*Ada\\* \\[x\\]</a>'
+    );
+  });
+});
+
+describe('{date}', () => {
+  const values = { title: 'T', url: 'https://example.com' };
+
+  it('formats with the formatter it is given, defaulting to YYYY-MM-DD', () => {
+    const asked: string[] = [];
+    const formatDate = (format: string) => {
+      asked.push(format);
+      return `<${format}>`;
+    };
+    assert.equal(
+      renderLink('[{title}]({url}) {date} {date:D MMM}', {
+        ...values,
+        formatDate,
+      }),
+      '[T](https://example.com) <YYYY-MM-DD> <D MMM>'.replace(
+        /[<>]/g,
+        (c) => `\\${c}`
+      )
+    );
+    assert.deepEqual(asked, ['YYYY-MM-DD', 'D MMM']);
+  });
+
+  it("falls back to the local ISO date when there's no formatter", () => {
+    assert.equal(localIsoDate(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
+    assert.equal(
+      renderLink('[{title}]({url}) {date}', values),
+      `[T](https://example.com) ${localIsoDate()}`
+    );
+  });
+});
+
+describe('empty values', () => {
+  const values = { title: 'Title', url: 'https://example.com' };
+  const render = (template: string) => renderLink(template, values);
+
+  it('take the separator before them along', () => {
+    assert.equal(
+      render('[{title} - {author}]({url})'),
+      '[Title](https://example.com)'
+    );
+    assert.equal(
+      render('[{title} | {site}]({url})'),
+      '[Title](https://example.com)'
+    );
+    assert.equal(
+      render('[{title} · {section}]({url})'),
+      '[Title](https://example.com)'
+    );
+  });
+
+  it('take the separator after them along when none comes before', () => {
+    assert.equal(
+      render('[{author}: {title}]({url})'),
+      '[Title](https://example.com)'
+    );
+    assert.equal(
+      render('[{site} - {title}]({url})'),
+      '[Title](https://example.com)'
+    );
+  });
+
+  it('drop the parentheses around them', () => {
+    assert.equal(
+      render('[{title}]({url}) ({author})'),
+      '[Title](https://example.com)'
+    );
+  });
+
+  it('leave one space where they sat between two words', () => {
+    assert.equal(
+      render('[{title} {author} here]({url})'),
+      '[Title here](https://example.com)'
+    );
+  });
+
+  it('keep the separators between values that are there', () => {
+    assert.equal(
+      render('[{title} - {author} - {domain}]({url})'),
+      '[Title - example.com](https://example.com)'
+    );
+  });
+
+  it('collapse inside a quoted link title too', () => {
+    assert.equal(
+      render('[{title}]({url} "{site} - {description}")'),
+      '[Title](https://example.com "")'
+    );
+  });
+
+  it("don't touch a destination or an HTML attribute", () => {
+    assert.equal(
+      render('<a href="{url}" data-x="- {author}">{title}</a>'),
+      '<a href="https://example.com" data-x="- ">Title</a>'
+    );
+  });
 });
 
 describe('needsTitle', () => {
@@ -285,5 +456,22 @@ describe('mergeSettings and the link format', () => {
 
   it('keeps a known one', () => {
     assert.equal(mergeSettings({ linkFormat: 'custom' }).linkFormat, 'custom');
+  });
+});
+
+describe('pageFieldsIn', () => {
+  it('lists the page fields a template shows besides the title', () => {
+    assert.deepEqual(
+      pageFieldsIn('[{title} - {author}]({url} "{description}") {author}'),
+      ['author', 'description']
+    );
+    assert.deepEqual(pageFieldsIn('[{site}: {section}]({url})'), [
+      'site',
+      'section',
+    ]);
+  });
+
+  it('is empty for the title, URL, domain and date alone', () => {
+    assert.deepEqual(pageFieldsIn('[{title}]({url}) {domain} {date}'), []);
   });
 });

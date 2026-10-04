@@ -103,7 +103,7 @@ const ja: Strings = {
     },
     customLinkFormat: {
       name: 'カスタム形式',
-      desc: '{title}、{url}、{domain} が使えます。{title} を含めない場合はタイトルを取得しません。',
+      desc: '{title}、{url}、{domain}、{author}、{site}、{description}、{section}（#付きリンクが指す見出し）、{date} または {date:YYYY-MM-DD} が使えます。値がない場合は、隣の区切り文字ごと省かれます。{url}、{domain}、{date} だけを使う場合はページを取得しません。',
     },
     decodeUrls: {
       name: 'URLをデコード',
@@ -112,9 +112,11 @@ const ja: Strings = {
     templateErrors: {
       missingUrl: '形式には {url} が必要です。',
       unknownPlaceholder: (name: string) =>
-        `{${name}} はプレースホルダーではありません。{title}、{url}、{domain} を使ってください。`,
+        `{${name}} はプレースホルダーではありません。{title}、{url}、{domain}、{author}、{site}、{description}、{section}、{date} を使ってください。`,
       unquotedInTag: (name: string) =>
         `{${name}} は href="{${name}}" のように引用符で囲んだ属性値の中に置いてください。`,
+      emptyDateFormat:
+        '{date:} のコロンの後に {date:YYYY-MM-DD} のような書式を書くか、{date} を使ってください。',
     },
   },
 };

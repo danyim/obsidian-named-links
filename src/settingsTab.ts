@@ -101,6 +101,8 @@ export class NamedLinksSettingTab extends PluginSettingTab {
         return messages.unknownPlaceholder(error.name);
       case 'unquotedInTag':
         return messages.unquotedInTag(error.name);
+      case 'emptyDateFormat':
+        return messages.emptyDateFormat;
     }
   }
 

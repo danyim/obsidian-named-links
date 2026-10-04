@@ -34,8 +34,29 @@ export const LINK_FORMATS: Record<Exclude<LinkFormat, 'custom'>, string> = {
 
 export const DEFAULT_TEMPLATE = LINK_FORMATS.markdown;
 
-const PLACEHOLDERS = ['title', 'url', 'domain'] as const;
+const PLACEHOLDERS = [
+  'title',
+  'url',
+  'domain',
+  'author',
+  'site',
+  'description',
+  'section',
+  'date',
+] as const;
 type Placeholder = (typeof PLACEHOLDERS)[number];
+
+/** The placeholders whose values come from fetching the page. */
+const PAGE_PLACEHOLDERS: readonly Placeholder[] = [
+  'title',
+  'author',
+  'site',
+  'description',
+  'section',
+];
+
+/** `{date}` with no format of its own. */
+export const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD';
 
 type Context = 'text' | 'destination' | 'linkTitle' | 'attribute' | 'tag';
 
@@ -44,6 +65,8 @@ interface Piece {
   placeholder?: Placeholder;
   /** Any `{name}`, known or not, so validation can report unknown ones. */
   name?: string;
+  /** What follows the colon in `{name:format}`, or undefined if none. */
+  format?: string;
   context: Context;
   /** The quote character a link title or attribute value is enclosed in. */
   quote?: string;
@@ -74,11 +97,12 @@ function parse(template: string): Piece[] {
   for (let i = 0; i < template.length; i++) {
     const ch = template[i];
 
-    const name = /^\{([a-zA-Z]+)\}/.exec(template.slice(i));
+    const name = /^\{([a-zA-Z]+)(?::([^{}\n]*))?\}/.exec(template.slice(i));
     if (name) {
       flush();
       pieces.push({
         name: name[1],
+        format: name[2],
         placeholder: isPlaceholder(name[1]) ? name[1] : undefined,
         context,
         quote: quote || undefined,
@@ -89,6 +113,10 @@ function parse(template: string): Piece[] {
     }
 
     literal += ch;
+    // A literal stays within one context, so tidying around an empty value
+    // can tell link text from the destination after it. The characters that
+    // switch contexts stay with the context they close.
+    const before: Context = context;
     switch (context) {
       case 'text':
         if (ch === ']' && template[i + 1] === '(') {
@@ -128,6 +156,10 @@ function parse(template: string): Piece[] {
         }
         break;
     }
+    if (context !== before && literal !== '') {
+      pieces.push({ literal, context: before });
+      literal = '';
+    }
   }
   flush();
   return pieces;
@@ -136,15 +168,30 @@ function parse(template: string): Piece[] {
 export type TemplateError =
   | { code: 'missingUrl' }
   | { code: 'unknownPlaceholder'; name: string }
-  | { code: 'unquotedInTag'; name: string };
+  | { code: 'unquotedInTag'; name: string }
+  | { code: 'emptyDateFormat' };
+
+/** `{name}`, or `{name:format}`, as the template wrote it. */
+function written(piece: Piece): string {
+  return piece.format === undefined
+    ? (piece.name ?? '')
+    : `${piece.name}:${piece.format}`;
+}
 
 /** Why a template can't be used, or null if it can. */
 export function validateTemplate(template: string): TemplateError | null {
   const pieces = parse(template);
   for (const piece of pieces) {
     if (piece.name === undefined) continue;
-    if (!piece.placeholder) {
-      return { code: 'unknownPlaceholder', name: piece.name };
+    // Only {date} takes a format.
+    if (
+      !piece.placeholder ||
+      (piece.format !== undefined && piece.placeholder !== 'date')
+    ) {
+      return { code: 'unknownPlaceholder', name: written(piece) };
+    }
+    if (piece.placeholder === 'date' && piece.format?.trim() === '') {
+      return { code: 'emptyDateFormat' };
     }
     if (piece.context === 'tag') {
       return { code: 'unquotedInTag', name: piece.name };
@@ -156,9 +203,45 @@ export function validateTemplate(template: string): TemplateError | null {
   return null;
 }
 
-/** Whether rendering the template needs a fetched title at all. */
+/** Whether the template shows a title. */
 export function needsTitle(template: string): boolean {
   return parse(template).some((piece) => piece.placeholder === 'title');
+}
+
+/** Something a page says about itself, other than its title. */
+export type PageField = 'author' | 'site' | 'description' | 'section';
+
+const PAGE_FIELDS: readonly PageField[] = [
+  'author',
+  'site',
+  'description',
+  'section',
+];
+
+/**
+ * The page fields the template shows besides the title, so a lookup can
+ * tell which of them it has to find.
+ */
+export function pageFieldsIn(template: string): PageField[] {
+  const shown = new Set<PageField>();
+  for (const piece of parse(template)) {
+    const name = piece.placeholder as PageField | undefined;
+    if (name && PAGE_FIELDS.includes(name)) shown.add(name);
+  }
+  return [...shown];
+}
+
+/**
+ * Whether rendering the template needs the page fetched at all: it shows the
+ * title, author, site, description or section. `{date}`, `{url}` and
+ * `{domain}` don't need it.
+ */
+export function needsPageInfo(template: string): boolean {
+  return parse(template).some(
+    (piece) =>
+      piece.placeholder !== undefined &&
+      PAGE_PLACEHOLDERS.includes(piece.placeholder)
+  );
 }
 
 /**
@@ -224,6 +307,23 @@ export interface LinkValues {
    * of their own to keep rather than escape.
    */
   titleIsMarkdown?: boolean;
+  /** The rest of what the page says about itself; missing ones render empty. */
+  author?: string | null;
+  site?: string | null;
+  description?: string | null;
+  section?: string | null;
+  /**
+   * Formats the moment the link is written with a moment.js-style format.
+   * The plugin passes Obsidian's bundled moment; without one, `{date}` is the
+   * local ISO date whatever its format says, which only tests rely on.
+   */
+  formatDate?: (format: string) => string;
+}
+
+/** Today in the local time zone, as YYYY-MM-DD. */
+export function localIsoDate(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 function domainOf(url: string): string {
@@ -289,20 +389,113 @@ function escapeFor(
   }
 }
 
+// A separator between two values: a hyphen, dash, bar, middle dot, bullet,
+// colon, comma or slash, with any spaces around it.
+const SEPARATOR = String.raw`\s*(?:[-|·•:,/]|–|—)\s*`;
+const SEPARATOR_AT_END = new RegExp(`${SEPARATOR}$`, 'u');
+const SEPARATOR_AT_START = new RegExp(`^${SEPARATOR}`, 'u');
+
+interface Rendered {
+  text: string;
+  context: Context;
+  /** A placeholder whose value came out empty. */
+  empty: boolean;
+}
+
+/**
+ * Tidies the text around values that came out empty, such as a page with no
+ * author, so a template like `{title} - {author}` doesn't leave `Title - `.
+ * For each empty value, in text and quoted link titles only:
+ *
+ * 1. Wrapped in parentheses, as in ` ({author})`, the parentheses and the
+ *    space before them go.
+ * 2. Otherwise one separator next to it goes: the one just before it if
+ *    there is one (`{title} - {author}`), else the one just after it
+ *    (`{author}: {title}`).
+ * 3. Otherwise, a space on both sides becomes one space.
+ *
+ * Only the literal text right next to the empty value changes; the rest of
+ * the template is written as it stands.
+ */
+function collapseEmpty(parts: Rendered[]): void {
+  parts.forEach((part, i) => {
+    if (!part.empty) return;
+    if (part.context !== 'text' && part.context !== 'linkTitle') return;
+    const sameContext = (other: Rendered | undefined) =>
+      other !== undefined && !other.empty && other.context === part.context;
+    const before = sameContext(parts[i - 1]) ? parts[i - 1] : undefined;
+    const after = sameContext(parts[i + 1]) ? parts[i + 1] : undefined;
+
+    if (
+      before &&
+      after &&
+      /\s*\($/.test(before.text) &&
+      after.text.startsWith(')')
+    ) {
+      before.text = before.text.replace(/\s*\($/, '');
+      after.text = after.text.slice(1);
+    } else if (before && SEPARATOR_AT_END.test(before.text)) {
+      before.text = before.text.replace(SEPARATOR_AT_END, '');
+    } else if (after && SEPARATOR_AT_START.test(after.text)) {
+      after.text = after.text.replace(SEPARATOR_AT_START, '');
+    } else if (
+      before &&
+      after &&
+      /\s$/.test(before.text) &&
+      /^\s/.test(after.text)
+    ) {
+      after.text = after.text.replace(/^\s+/, '');
+    }
+  });
+}
+
 /** Renders a finished link from a template that passes validation. */
 export function renderLink(template: string, values: LinkValues): string {
-  const raw: Record<Placeholder, string> = {
-    title: values.title,
-    url: values.url,
-    domain: domainOf(values.url),
+  const date = (format: string | undefined) =>
+    values.formatDate
+      ? values.formatDate(format ?? DEFAULT_DATE_FORMAT)
+      : localIsoDate();
+  const raw = (name: Placeholder, format: string | undefined): string => {
+    switch (name) {
+      case 'title':
+        return values.title;
+      case 'url':
+        return values.url;
+      case 'domain':
+        return domainOf(values.url);
+      case 'author':
+        return values.author ?? '';
+      case 'site':
+        return values.site ?? '';
+      case 'description':
+        return values.description ?? '';
+      case 'section':
+        return values.section ?? '';
+      case 'date':
+        return date(format);
+    }
   };
-  return parse(template)
-    .map((piece) => {
-      if (piece.literal !== undefined) return piece.literal;
-      const name = piece.placeholder;
-      // Unknown placeholders are left as written; validation reports them.
-      if (!name) return `{${piece.name}}`;
-      return escapeFor(piece, name, raw[name], values);
-    })
-    .join('');
+
+  const parts: Rendered[] = parse(template).map((piece) => {
+    if (piece.literal !== undefined) {
+      return { text: piece.literal, context: piece.context, empty: false };
+    }
+    const name = piece.placeholder;
+    // Unknown placeholders are left as written; validation reports them.
+    if (!name) {
+      return {
+        text: `{${written(piece)}}`,
+        context: piece.context,
+        empty: false,
+      };
+    }
+    const value = raw(name, piece.format);
+    return {
+      text: escapeFor(piece, name, value, values),
+      context: piece.context,
+      empty: value === '' && name !== 'url',
+    };
+  });
+  collapseEmpty(parts);
+  return parts.map((part) => part.text).join('');
 }
