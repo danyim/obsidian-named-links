@@ -4,8 +4,7 @@
  * Run with `npm run screenshots`. Writes straight into screenshots/, so the
  * images in the README are always something the current code produced.
  *
- * Each image is a composite: the same view rendered in light mode on the left
- * and dark mode on the right, joined at a seam down the middle.
+ * Each image is the settings tab as Obsidian renders it in dark mode.
  *
  * Adapted from the capture script in danyim/obsidian-list-callouts-improved.
  */
@@ -18,9 +17,6 @@ import type { NamedLinksSettings } from '../../src/settings';
 import { isMobile, resetPlugin, setSettings } from '../helpers';
 
 const OUT_DIR = path.resolve('screenshots');
-
-/** Gutter between the two halves of a composite, in pixels. */
-const GAP = 20;
 
 /**
  * The settings the pictures show: the defaults, with the title clean-up and
@@ -42,71 +38,6 @@ async function setColorScheme(dark: boolean): Promise<void> {
 
   // Let the repaint settle before the screenshot.
   await browser.pause(250);
-}
-
-/**
- * Stitch two captures side by side on a canvas.
- *
- * Done in the page rather than with an image library so `npm run screenshots`
- * needs nothing beyond what the tests already install. A canvas is also not
- * bound by the window size, which a screenshot of a composed element would be.
- */
-async function sideBySide(light: string, dark: string): Promise<Buffer> {
-  const encoded = await browser.executeObsidian(
-    async (_obsidian, lightData: string, darkData: string, gap: number) => {
-      const load = (data: string) =>
-        new Promise<HTMLImageElement>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error('could not decode a capture'));
-          img.src = `data:image/png;base64,${data}`;
-        });
-
-      const [a, b] = await Promise.all([load(lightData), load(darkData)]);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = a.width + gap + b.width;
-      canvas.height = Math.max(a.height, b.height);
-
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(a, 0, 0);
-      ctx.drawImage(b, a.width + gap, 0);
-
-      // Nothing is left transparent: the gap and whatever lies below the
-      // shorter capture take on the background of the half they belong to,
-      // so the seam sits in the middle and no viewer shows a checkerboard.
-      // The color comes from the capture's bottom row, below the last
-      // settings group, which is plain page background; the top edge can
-      // carry the remains of a shadow or fade from above the pane.
-      const cornerColor = (img: HTMLImageElement, x: number) => {
-        const probe = document.createElement('canvas');
-        probe.width = 1;
-        probe.height = 1;
-        const probeCtx = probe.getContext('2d')!;
-        probeCtx.drawImage(img, x, img.height - 1, 1, 1, 0, 0, 1, 1);
-        const [r, g, bl] = probeCtx.getImageData(0, 0, 1, 1).data;
-        return `rgb(${r}, ${g}, ${bl})`;
-      };
-
-      const half = Math.floor(gap / 2);
-      const mid = a.width + half;
-
-      ctx.fillStyle = cornerColor(a, a.width - 1);
-      ctx.fillRect(a.width, 0, half, canvas.height);
-      ctx.fillRect(0, a.height, a.width, canvas.height - a.height);
-
-      ctx.fillStyle = cornerColor(b, 0);
-      ctx.fillRect(mid, 0, gap - half, canvas.height);
-      ctx.fillRect(a.width + gap, b.height, b.width, canvas.height - b.height);
-
-      return canvas.toDataURL('image/png').split(',')[1];
-    },
-    light,
-    dark,
-    GAP
-  );
-
-  return Buffer.from(encoded, 'base64');
 }
 
 /**
@@ -449,24 +380,19 @@ async function stackVertically(slices: PaneSlice[]): Promise<string> {
   }, slices);
 }
 
-/** Capture the whole of the plugin's settings tab, in both color schemes. */
+/** Capture the whole of the plugin's settings tab, in dark mode. */
 async function captureSettingsPage(name: string): Promise<void> {
   await fs.mkdir(OUT_DIR, { recursive: true });
 
   const { pane, original, topInset } = await enterSettingsWindow();
 
-  await setColorScheme(false);
-  const light = await shotScrolled(pane, 'settings-light', topInset);
-
   await setColorScheme(true);
   const dark = await shotScrolled(pane, 'settings-dark', topInset);
-
-  await setColorScheme(false);
 
   // Compose back in the main window, where the Obsidian globals live.
   await browser.switchToWindow(original);
   await browser.executeObsidian(({ app }) => (app as any).setting.close());
-  await fs.writeFile(path.join(OUT_DIR, name), await sideBySide(light, dark));
+  await fs.writeFile(path.join(OUT_DIR, name), Buffer.from(dark, 'base64'));
 }
 
 /**
