@@ -269,6 +269,22 @@ describe('Pasting a URL', function () {
     });
   });
 
+  it('titles a menu paste made just after a plain paste', async function () {
+    // Choosing Paste from the context menu brings no keystroke to end the
+    // plain paste before it, but the click that opens the menu does.
+    await openNote('‸');
+    await paste(`${base}/page?title=Plain`, { plain: true });
+    await browser.executeObsidian(() => {
+      document.body.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true })
+      );
+    });
+    const url = `${base}/page?title=Menu`;
+    await paste(` ${url}`, { viaKeyboard: false });
+    await settled();
+    expect(await editorValue()).toBe(`${base}/page?title=Plain [Menu](${url})`);
+  });
+
   // Real keystrokes through WebDriver, with the URL on the real clipboard,
   // rather than synthetic events: what Obsidian does with each shortcut is
   // the thing under test.

@@ -24,9 +24,10 @@ import { NamedLinksSettingTab } from './settingsTab';
 
 const REQUEST_TIMEOUT_MS = 15 * 1000;
 
-// The longest a Mod+Shift+V keystroke counts as a plain-text paste, when no
-// other key is pressed after it.
-const PLAIN_PASTE_WINDOW_MS = 1000;
+// The longest a Mod+Shift+V keystroke counts as a plain-text paste. Its paste
+// events arrive within milliseconds of it; this only bounds the case where
+// nothing else happens afterwards.
+const PLAIN_PASTE_WINDOW_MS = 500;
 
 function fileOf(info: MarkdownView | MarkdownFileInfo | null): TFile | null {
   return info?.file ?? null;
@@ -201,6 +202,16 @@ export default class NamedLinksPlugin extends Plugin {
         } else {
           this.plainPasteUntil = 0;
         }
+      },
+      { capture: true }
+    );
+    // A click, such as choosing Paste from a context menu, ends a plain
+    // paste too: that paste comes with no keystroke to end it otherwise.
+    this.registerDomEvent(
+      win,
+      'pointerdown',
+      () => {
+        this.plainPasteUntil = 0;
       },
       { capture: true }
     );

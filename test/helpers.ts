@@ -102,26 +102,28 @@ export function editorValue(): Promise<string> {
  * event.
  *
  * A Mod+V keydown comes first, or Mod+Shift+V with `plain`, as a keyboard
- * paste does.
+ * paste does; `viaKeyboard: false` leaves it out, as a menu paste would.
  */
 export async function paste(
   text: string,
-  options: { plain?: boolean } = {}
+  options: { plain?: boolean; viaKeyboard?: boolean } = {}
 ): Promise<void> {
   await browser.executeObsidian(
-    ({ app, obsidian }, text, plain) => {
+    ({ app, obsidian }, text, plain, viaKeyboard) => {
       const view = app.workspace.getActiveViewOfType(obsidian.MarkdownView)!;
       const content = (view.editor as any).cm.contentDOM as HTMLElement;
-      content.dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: plain ? 'V' : 'v',
-          code: 'KeyV',
-          ctrlKey: true,
-          shiftKey: plain,
-          bubbles: true,
-          cancelable: true,
-        })
-      );
+      if (viaKeyboard) {
+        content.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: plain ? 'V' : 'v',
+            code: 'KeyV',
+            ctrlKey: true,
+            shiftKey: plain,
+            bubbles: true,
+            cancelable: true,
+          })
+        );
+      }
       const data = new DataTransfer();
       data.setData('text/plain', text);
       const evt = new ClipboardEvent('paste', {
@@ -132,7 +134,8 @@ export async function paste(
       content.dispatchEvent(evt);
     },
     text,
-    options.plain ?? false
+    options.plain ?? false,
+    options.viaKeyboard ?? true
   );
 }
 
