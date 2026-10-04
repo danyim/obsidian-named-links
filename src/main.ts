@@ -11,6 +11,7 @@ import {
 
 import { NamedLinksApi, createApi } from './api';
 import { cleanupTitle } from './cleanup';
+import { ClipboardLinkData, copiedLinkTitle } from './clipboardTitle';
 import { obsidianHttpClient } from './http';
 import { t } from './lang';
 import { Linker } from './linker';
@@ -23,6 +24,7 @@ import {
   settingsFromAutoLinkTitle,
 } from './settings';
 import { NamedLinksSettingTab } from './settingsTab';
+import { toAbsoluteUrl, unwrapAutolink } from './url';
 import { vimPutWatcher } from './vim';
 
 const REQUEST_TIMEOUT_MS = 15 * 1000;
@@ -62,6 +64,35 @@ export default class NamedLinksPlugin extends Plugin {
   /** Per request. A field so the tests can shorten it. */
   requestTimeoutMs = REQUEST_TIMEOUT_MS;
 
+  /** Runs a title through the clean-up settings: site name and rules. */
+  private cleanUp(title: string, url: string, siteName: string | null) {
+    return cleanupTitle(title, {
+      url,
+      siteName,
+      removeSiteName: this.settings.removeSiteName,
+      domainRules: this.settings.domainTitleRules,
+      pageRules: this.settings.titleRules,
+    });
+  }
+
+  /**
+   * The title a single pasted or dropped URL already carries, cleaned up,
+   * or null to fetch one.
+   */
+  private copiedTitle(text: string, data: DataTransfer | null): string | null {
+    if (!data) return null;
+    const tokens = text.trim().split(/\s+/);
+    if (tokens.length !== 1) return null;
+    const url = toAbsoluteUrl(unwrapAutolink(tokens[0]));
+    if (!url) return null;
+    const carried: ClipboardLinkData = {
+      html: data.getData('text/html') || undefined,
+      mozUrl: data.getData('text/x-moz-url') || undefined,
+    };
+    const title = copiedLinkTitle(carried, url);
+    return title === null ? null : this.cleanUp(title, url, null);
+  }
+
   /**
    * The timeout also caps the whole lookup, not just each request: an
    * unresponsive host would otherwise hold the placeholder through the HEAD,
@@ -81,15 +112,7 @@ export default class NamedLinksPlugin extends Plugin {
         siteName = name;
       },
     }).then((title) =>
-      title === null
-        ? null
-        : cleanupTitle(title, {
-            url,
-            siteName,
-            removeSiteName: this.settings.removeSiteName,
-            domainRules: this.settings.domainTitleRules,
-            pageRules: this.settings.titleRules,
-          })
+      title === null ? null : this.cleanUp(title, url, siteName)
     );
     return Promise.race([lookup, deadline]).finally(() =>
       window.clearTimeout(timer)
@@ -127,7 +150,11 @@ export default class NamedLinksPlugin extends Plugin {
         }
 
         if (!this.settings.enhancePaste) return;
-        const plan = this.planInsert(editor, text);
+        const plan = this.planInsert(
+          editor,
+          text,
+          this.copiedTitle(text, evt.clipboardData)
+        );
         if (!plan) return;
 
         evt.preventDefault();
@@ -147,7 +174,11 @@ export default class NamedLinksPlugin extends Plugin {
         const pos = this.dropPosition(editor, evt);
         if (pos === null) return;
         editor.setCursor(pos);
-        const plan = this.planInsert(editor, text);
+        const plan = this.planInsert(
+          editor,
+          text,
+          this.copiedTitle(text, evt.dataTransfer)
+        );
         if (!plan) return;
 
         evt.preventDefault();
@@ -265,14 +296,18 @@ export default class NamedLinksPlugin extends Plugin {
       : editor.offsetToPos(offset);
   }
 
-  private planInsert(editor: Editor, text: string) {
+  private planInsert(
+    editor: Editor,
+    text: string,
+    copiedTitle: string | null = null
+  ) {
     // With several cursors the same placeholder would go in at each of them,
     // and only one could ever be replaced.
     if (editor.listSelections().length > 1) return null;
     if (this.linker.isRawContext(editor, editor.getCursor('from'))) {
       return null;
     }
-    const plan = this.linker.plan(text, editor.getSelection());
+    const plan = this.linker.plan(text, editor.getSelection(), copiedTitle);
     if (!plan) return null;
     if (plan.pending.length > 0 && !this.checkOnline()) return null;
     return plan;

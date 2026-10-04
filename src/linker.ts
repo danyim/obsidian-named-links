@@ -145,8 +145,16 @@ export class Linker {
    *
    * Every whitespace-separated token has to be a URL; anything else is prose
    * with a URL in it, which is pasted as it is.
+   *
+   * `copiedTitle` is the title a single pasted or dropped URL already
+   * carried, cleaned up as a fetched title would be. It's used instead of
+   * fetching one, so the link is finished straight away.
    */
-  plan(text: string, selection: string): InsertPlan | null {
+  plan(
+    text: string,
+    selection: string,
+    copiedTitle: string | null = null
+  ): InsertPlan | null {
     // Odd indexes hold the whitespace between tokens; the ends can be empty.
     const tokens = text.split(/(\s+)/);
     const urls = tokens.filter((t, i) => i % 2 === 0 && t !== '');
@@ -183,6 +191,12 @@ export class Linker {
       }
       // A format without the title is finished straight away, unfetched.
       if (!this.wantsTitle) return this.link(url, '');
+      if (copiedTitle && urls.length === 1) {
+        return this.link(
+          url,
+          readableTitle(copiedTitle, this.settings.maxTitleLength)
+        );
+      }
       const placeholder = newPlaceholder();
       pending.push({ placeholder, url, fallback: token });
       return `[${placeholder}](${linkDestination(url)})`;

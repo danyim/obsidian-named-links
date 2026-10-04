@@ -11,6 +11,7 @@ Paste a URL into Obsidian and get a markdown link titled with the page's name: `
 
 - **Paste a URL** and a `[Fetching title…](url)` placeholder goes in straight away, then becomes the titled link. Several URLs pasted at once are each titled.
 - **Drop a URL** from another app and the same happens where you drop it.
+- **A link copied or dragged with its own text** (Edge's Copy link, a link dragged out of a page, Firefox) uses that text as the title straight away, without fetching, so it works for pages behind a login. Text that says nothing, like the bare URL or "click here", is fetched over.
 - **Paste text over a selected URL** (or a whole link) to make the text its title, with nothing fetched. This one is off until you turn it on in settings.
 - **Title URLs already in a note** with the [Add a title to an existing URL](#commands) command.
 - **In vim mode**, putting a URL with `p` or `P` titles it the same way, counts, registers and visual mode included.
@@ -131,7 +132,7 @@ What's different from Auto Link Title 1.5.5:
 
 ## Privacy
 
-Named Links requests the pasted URL from your device, without loading its scripts, images or media, and checks the headers first so large files aren't downloaded. YouTube, Vimeo, Spotify and SoundCloud links go to that site's oEmbed API instead. Excluded sites are never requested.
+Named Links requests the pasted URL from your device, without loading its scripts, images or media, and checks the headers first so large files aren't downloaded. YouTube, Vimeo, Spotify and SoundCloud links go to that site's oEmbed API instead. Excluded sites are never requested, and neither is a link that came with its own title.
 
 The one opt-in exception: **Fetch X posts through FxTwitter** sends twitter.com and x.com URLs to fxtwitter.com or fixupx.com, a third-party service. There's no telemetry.
 
