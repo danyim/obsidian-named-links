@@ -11,6 +11,7 @@ import {
   resetPlugin,
   setSettings,
   settled,
+  withSystemClipboard,
 } from '../helpers';
 import {
   clearRequestLog,
@@ -290,12 +291,14 @@ describe('Pasting a URL', function () {
   // the thing under test.
   describe('with real keystrokes', function () {
     async function pressWithClipboard(text: string, keys: string[]) {
-      await browser.executeObsidian(async (_, text) => {
-        await navigator.clipboard.writeText(text);
-      }, text);
-      await browser.keys(keys);
-      await browser.pause(300);
-      await settled();
+      await withSystemClipboard(async () => {
+        await browser.executeObsidian(async (_, text) => {
+          await navigator.clipboard.writeText(text);
+        }, text);
+        await browser.keys(keys);
+        await browser.pause(300);
+        await settled();
+      });
     }
 
     it('titles a URL pasted with Ctrl+V', async function () {
