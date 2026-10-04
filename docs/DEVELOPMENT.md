@@ -21,6 +21,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `title.ts` | Cleans, shortens and escapes a title for use as link text. |
 | `api.ts` | The API other plugins and scripts use (`plugin.api`). Only type imports from Obsidian-facing modules, so the unit tests run it against a fake host. Its shape is versioned: see the README's Scripting section before changing it. |
 | `cleanup.ts` | The optional clean-up between fetching a title and shortening it: removing the site name, and the user's title rules. |
+| `clipboardTitle.ts` | Reads the title a pasted or dropped link already carries (copied HTML, Firefox's `text/x-moz-url`) and decides whether it beats fetching one. |
 | `context.ts` | Tells whether a position is in code, frontmatter or a link target. |
 | `settings.ts` | The settings shape and defaults, excluded-site matching, and the Auto Link Title import. |
 | `linkFormat.ts` | Renders a finished link from the link format template, escaping each placeholder for the part of the template it sits in, and validates custom templates. |
@@ -28,7 +29,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `vim.ts` | Notices vim's `p` and `P` putting text into an editor, which they do without a paste event, so the URLs they put can be titled. |
 | `lang/` | UI strings: `en.ts` defines them, `ja.ts` translates them, `index.ts` picks one by Obsidian's language. |
 
-`url.ts`, `title.ts`, `cleanup.ts`, `context.ts`, `scraper.ts`, `linkFormat.ts` and
+`url.ts`, `title.ts`, `cleanup.ts`, `clipboardTitle.ts`, `context.ts`, `scraper.ts`, `linkFormat.ts` and
 `settings.ts` don't import
 `obsidian`, which is what lets the unit tests run them directly. Keep them that
 way; anything that needs the Obsidian API goes in the other modules.
