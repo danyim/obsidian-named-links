@@ -1,3 +1,4 @@
+import { EditorView } from '@codemirror/view';
 import {
   Editor,
   MarkdownFileInfo,
@@ -21,6 +22,7 @@ import {
   settingsFromAutoLinkTitle,
 } from './settings';
 import { NamedLinksSettingTab } from './settingsTab';
+import { vimPutWatcher } from './vim';
 
 const REQUEST_TIMEOUT_MS = 15 * 1000;
 
@@ -140,6 +142,10 @@ export default class NamedLinksPlugin extends Plugin {
       })
     );
 
+    this.registerEditorExtension(
+      vimPutWatcher((view, from, to) => this.titleVimPut(view, from, to))
+    );
+
     this.watchWindow(window);
     this.registerEvent(
       this.app.workspace.on('window-open', (_win, popout) =>
@@ -257,6 +263,35 @@ export default class NamedLinksPlugin extends Plugin {
     if (!plan) return null;
     if (plan.pending.length > 0 && !this.checkOnline()) return null;
     return plan;
+  }
+
+  /**
+   * Titles the URLs a vim `p` or `P` just put into a note, under the same
+   * setting and rules as a paste (upstream #7).
+   */
+  private titleVimPut(view: EditorView, from: number, to: number) {
+    if (!this.settings.enhancePaste) return;
+    const markdown = this.app.workspace
+      .getLeavesOfType('markdown')
+      .map((leaf) => leaf.view)
+      .find(
+        (v): v is MarkdownView =>
+          v instanceof MarkdownView &&
+          (v.editor as Editor & { cm?: EditorView }).cm === view
+      );
+    if (!markdown) return;
+    const plan = this.linker.planInserted(markdown.editor, from, to);
+    if (!plan) return;
+    if (plan.pending.length > 0 && !this.checkOnline()) return;
+    this.track(
+      this.linker.replaceInserted(
+        markdown.editor,
+        markdown.file,
+        from,
+        to,
+        plan
+      )
+    );
   }
 
   private checkOnline(): boolean {

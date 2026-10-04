@@ -24,6 +24,7 @@ The plugin is TypeScript bundled by esbuild (`config/esbuild.config.mjs`) into
 | `settings.ts` | The settings shape and defaults, excluded-site matching, and the Auto Link Title import. |
 | `linkFormat.ts` | Renders a finished link from the link format template, escaping each placeholder for the part of the template it sits in, and validates custom templates. |
 | `settingsTab.ts` | The settings tab, through `getSettingDefinitions()`. |
+| `vim.ts` | Notices vim's `p` and `P` putting text into an editor, which they do without a paste event, so the URLs they put can be titled. |
 | `lang/` | UI strings: `en.ts` defines them, `ja.ts` translates them, `index.ts` picks one by Obsidian's language. |
 
 `url.ts`, `title.ts`, `cleanup.ts`, `context.ts`, `scraper.ts`, `linkFormat.ts` and
