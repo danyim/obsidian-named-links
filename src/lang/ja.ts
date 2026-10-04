@@ -54,10 +54,6 @@ const ja: Strings = {
       name: '選択したURLにテキストをタイトルとして貼り付け',
       desc: '選択したURLやリンクの上にテキストを貼り付けた場合、URLを置き換えずにそのテキストをリンクのタイトルにする',
     },
-    skipCodeAndFrontmatter: {
-      name: 'コードとフロントマターを無視',
-      desc: 'コードブロック、インラインコード、フロントマター内に貼り付けたURLはそのままにする',
-    },
     titlesHeading: 'タイトル',
     removeSiteName: {
       name: 'サイト名を除去',

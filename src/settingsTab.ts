@@ -151,6 +151,46 @@ export class NamedLinksSettingTab extends PluginSettingTab {
       },
       {
         type: 'group',
+        heading: s.linkFormatHeading,
+        items: [
+          {
+            ...s.linkFormat,
+            control: {
+              type: 'dropdown',
+              key: 'linkFormat',
+              defaultValue: DEFAULT_SETTINGS.linkFormat,
+              options: {
+                markdown: s.linkFormat.markdown,
+                'markdown-title': s.linkFormat.markdownTitle,
+                html: s.linkFormat.html,
+                custom: s.linkFormat.custom,
+              },
+            },
+          },
+          {
+            ...s.customLinkFormat,
+            visible: () => this.plugin.settings.linkFormat === 'custom',
+            control: {
+              type: 'text',
+              key: 'customLinkFormat',
+              defaultValue: DEFAULT_SETTINGS.customLinkFormat,
+              placeholder: DEFAULT_SETTINGS.customLinkFormat,
+              validate: (value: string) =>
+                this.templateError(validateTemplate(value)),
+            },
+          },
+          {
+            ...s.decodeUrls,
+            control: {
+              type: 'toggle',
+              key: 'decodeUrls',
+              defaultValue: DEFAULT_SETTINGS.decodeUrls,
+            },
+          },
+        ],
+      },
+      {
+        type: 'group',
         heading: s.whenHeading,
         items: [
           {
@@ -183,14 +223,6 @@ export class NamedLinksSettingTab extends PluginSettingTab {
               type: 'toggle',
               key: 'pasteTitleOntoUrl',
               defaultValue: DEFAULT_SETTINGS.pasteTitleOntoUrl,
-            },
-          },
-          {
-            ...s.skipCodeAndFrontmatter,
-            control: {
-              type: 'toggle',
-              key: 'skipCodeAndFrontmatter',
-              defaultValue: DEFAULT_SETTINGS.skipCodeAndFrontmatter,
             },
           },
         ],
@@ -277,46 +309,6 @@ export class NamedLinksSettingTab extends PluginSettingTab {
                 url: s.excludedSiteFormat.url,
                 domain: s.excludedSiteFormat.domain,
               },
-            },
-          },
-        ],
-      },
-      {
-        type: 'group',
-        heading: s.linkFormatHeading,
-        items: [
-          {
-            ...s.linkFormat,
-            control: {
-              type: 'dropdown',
-              key: 'linkFormat',
-              defaultValue: DEFAULT_SETTINGS.linkFormat,
-              options: {
-                markdown: s.linkFormat.markdown,
-                'markdown-title': s.linkFormat.markdownTitle,
-                html: s.linkFormat.html,
-                custom: s.linkFormat.custom,
-              },
-            },
-          },
-          {
-            ...s.customLinkFormat,
-            visible: () => this.plugin.settings.linkFormat === 'custom',
-            control: {
-              type: 'text',
-              key: 'customLinkFormat',
-              defaultValue: DEFAULT_SETTINGS.customLinkFormat,
-              placeholder: DEFAULT_SETTINGS.customLinkFormat,
-              validate: (value: string) =>
-                this.templateError(validateTemplate(value)),
-            },
-          },
-          {
-            ...s.decodeUrls,
-            control: {
-              type: 'toggle',
-              key: 'decodeUrls',
-              defaultValue: DEFAULT_SETTINGS.decodeUrls,
             },
           },
         ],

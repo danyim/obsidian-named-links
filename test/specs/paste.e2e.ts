@@ -254,13 +254,18 @@ describe('Pasting a URL', function () {
       });
     }
 
-    it('titles code and frontmatter pastes once skipping is off', async function () {
-      await setSettings({ skipCodeAndFrontmatter: false });
-      await openNote('```\n‸\n```');
-      const url = `${base}/page?title=Coded`;
-      await paste(url);
-      await settled();
-      expect(await editorValue()).toBe(`\`\`\`\n[Coded](${url})\n\`\`\``);
+    it('still skips code where the removed setting was saved as off', async function () {
+      // "Skip code and frontmatter" used to be a setting. A vault that had
+      // turned it off keeps the key in data.json, and it has to be ignored.
+      await browser.executeObsidian(async ({ app }) => {
+        const p = (app as any).plugins.plugins['named-links'];
+        await p.saveData({ ...p.settings, skipCodeAndFrontmatter: false });
+        await p.loadSettings();
+      });
+      await openNote('```\n‸\n```', { source: true });
+      await paste(`${base}/page`);
+      expect(await editorValue()).toBe(`\`\`\`\n${base}/page\n\`\`\``);
+      expect(requestLog()).toEqual([]);
     });
   });
 

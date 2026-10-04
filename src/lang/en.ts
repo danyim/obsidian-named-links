@@ -50,10 +50,6 @@ const en = {
       name: 'Paste text onto a selected URL as its title',
       desc: 'When text is pasted over a selected URL or link, make the text its title instead of replacing the URL.',
     },
-    skipCodeAndFrontmatter: {
-      name: 'Skip code and frontmatter',
-      desc: 'Leave URLs pasted into code blocks, inline code or frontmatter as they are.',
-    },
     titlesHeading: 'Titles',
     removeSiteName: {
       name: 'Remove the site name',
