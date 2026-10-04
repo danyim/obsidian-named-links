@@ -15,7 +15,7 @@ import { ClipboardLinkData, copiedLinkTitle } from './clipboardTitle';
 import { obsidianHttpClient } from './http';
 import { t } from './lang';
 import { Linker } from './linker';
-import { fetchTitle } from './scraper';
+import { OEmbedProvider, PageInfo, fetchPageInfo } from './scraper';
 import {
   AUTO_LINK_TITLE_ID,
   AUTO_LINK_TITLE_NAME,
@@ -64,6 +64,9 @@ export default class NamedLinksPlugin extends Plugin {
   /** Per request. A field so the tests can shorten it. */
   requestTimeoutMs = REQUEST_TIMEOUT_MS;
 
+  /** Replaces the built-in oEmbed providers. A field so the tests can. */
+  oEmbedProviders: OEmbedProvider[] | undefined = undefined;
+
   /** Runs a title through the clean-up settings: site name and rules. */
   private cleanUp(title: string, url: string, siteName: string | null) {
     return cleanupTitle(title, {
@@ -94,25 +97,25 @@ export default class NamedLinksPlugin extends Plugin {
   }
 
   /**
-   * The timeout also caps the whole lookup, not just each request: an
-   * unresponsive host would otherwise hold the placeholder through the HEAD,
-   * the GET and any oEmbed request in turn.
+   * What the page at a URL says about itself, with its title cleaned up the
+   * way the settings ask. The timeout also caps the whole lookup, not just
+   * each request: an unresponsive host would otherwise hold the placeholder
+   * through the HEAD, the GET and any oEmbed request in turn.
    */
-  fetchTitle = (url: string): Promise<string | null> => {
+  fetchPageInfo = (url: string): Promise<PageInfo | null> => {
     let timer = 0;
     const deadline = new Promise<null>((resolve) => {
       timer = window.setTimeout(() => resolve(null), this.requestTimeoutMs);
     });
-    let siteName: string | null = null;
-    const lookup = fetchTitle(url, {
+    const lookup = fetchPageInfo(url, {
       http: obsidianHttpClient(this.requestTimeoutMs),
       language: getLanguage(),
       twitterProxy: this.settings.twitterProxy,
-      onSiteName: (name) => {
-        siteName = name;
-      },
-    }).then((title) =>
-      title === null ? null : this.cleanUp(title, url, siteName)
+      oEmbedProviders: this.oEmbedProviders,
+    }).then((info) =>
+      info === null
+        ? null
+        : { ...info, title: this.cleanUp(info.title, url, info.siteName) }
     );
     return Promise.race([lookup, deadline]).finally(() =>
       window.clearTimeout(timer)
@@ -124,9 +127,10 @@ export default class NamedLinksPlugin extends Plugin {
     this.linker = new Linker(this);
     this.api = createApi({
       settings: () => this.settings,
-      fetchTitle: (url) => this.fetchTitle(url),
-      link: (url, title) => this.linker.link(url, title),
+      fetchPageInfo: (url) => this.fetchPageInfo(url),
+      link: (url, title, page) => this.linker.link(url, title, false, page),
       wantsTitle: () => this.linker.wantsTitle,
+      wantsPageInfo: () => this.linker.wantsPageInfo,
     });
 
     this.addSettingTab(new NamedLinksSettingTab(this.app, this));

@@ -6,6 +6,7 @@
  * Only type imports from modules that import Obsidian, so the unit tests can
  * run the whole API against a fake host.
  */
+import type { PageInfo } from './scraper';
 import type { NamedLinksSettings } from './settings';
 import { isExcluded, parseExcludedSites } from './settings';
 import { readableTitle } from './title';
@@ -45,12 +46,20 @@ export interface NamedLinksApi {
 export interface ApiHost {
   /** Read on every call, so the API follows changes to the settings. */
   settings(): NamedLinksSettings;
-  /** The cleaned-up title, within the request timeout, or null. */
-  fetchTitle(url: string): Promise<string | null>;
-  /** A finished link in the user's link format, from a readable title. */
-  link(url: string, title: string): string;
+  /**
+   * What the page says about itself, its title cleaned up, within the
+   * request timeout, or null.
+   */
+  fetchPageInfo(url: string): Promise<PageInfo | null>;
+  /**
+   * A finished link in the user's link format, from a readable title and,
+   * for its other placeholders, what the page says about itself.
+   */
+  link(url: string, title: string, page?: PageInfo | null): string;
   /** Whether the link format shows the title at all. */
   wantsTitle(): boolean;
+  /** Whether the link format shows anything read from the page. */
+  wantsPageInfo(): boolean;
 }
 
 /** The absolute URL a caller's argument names, or null for anything else. */
@@ -68,18 +77,25 @@ export function createApi(host: ApiHost): NamedLinksApi {
   const excluded = (url: string) =>
     isExcluded(url, parseExcludedSites(host.settings().excludedSites));
 
-  const getTitle = async (input: string): Promise<string | null> => {
-    const url = apiUrl(input);
-    if (!url || excluded(url)) return null;
-    let title: string | null = null;
+  /** The page's info with its title made readable, or null. */
+  const readablePage = async (
+    url: string
+  ): Promise<{ title: string; page: PageInfo } | null> => {
+    let page: PageInfo | null = null;
     try {
-      title = await host.fetchTitle(url);
+      page = await host.fetchPageInfo(url);
     } catch {
       return null;
     }
-    if (title === null) return null;
-    const readable = readableTitle(title, host.settings().maxTitleLength);
-    return readable === '' ? null : readable;
+    if (page === null) return null;
+    const title = readableTitle(page.title, host.settings().maxTitleLength);
+    return title === '' ? null : { title, page };
+  };
+
+  const getTitle = async (input: string): Promise<string | null> => {
+    const url = apiUrl(input);
+    if (!url || excluded(url)) return null;
+    return (await readablePage(url))?.title ?? null;
   };
 
   return Object.freeze({
@@ -97,10 +113,14 @@ export function createApi(host: ApiHost): NamedLinksApi {
           ? host.link(url, hostnameOf(url))
           : asGiven(input);
       }
-      // A format without the title needs no fetch, as with a paste.
-      if (!host.wantsTitle()) return host.link(url, '');
-      const title = await getTitle(input);
-      return title === null ? asGiven(input) : host.link(url, title);
+      // A format showing nothing from the page needs no fetch, as with a
+      // paste; otherwise its other placeholders ({author}, {section}...)
+      // are filled from the same lookup as the title.
+      if (!host.wantsPageInfo()) return host.link(url, '');
+      const found = await readablePage(url);
+      return found === null
+        ? asGiven(input)
+        : host.link(url, found.title, found.page);
     },
 
     formatLink(input: string, title: string): string {

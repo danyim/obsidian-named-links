@@ -12,12 +12,19 @@ import {
   MarkdownView,
   Notice,
   TFile,
+  moment,
 } from 'obsidian';
 
 import { isInCode, isInFrontmatter, isLinkTargetPosition } from './context';
 import { changeTracked, finishPlaceholder, insertTracked } from './history';
 import { t } from './lang';
-import { needsTitle, renderLink, templateFor } from './linkFormat';
+import {
+  needsPageInfo,
+  needsTitle,
+  renderLink,
+  templateFor,
+} from './linkFormat';
+import type { PageInfo } from './scraper';
 import { NamedLinksSettings, isExcluded, parseExcludedSites } from './settings';
 import { readableTitle } from './title';
 import {
@@ -32,12 +39,12 @@ import {
   unwrapAutolink,
 } from './url';
 
-export type TitleFetcher = (url: string) => Promise<string | null>;
+export type PageInfoFetcher = (url: string) => Promise<PageInfo | null>;
 
 export interface LinkerHost {
   app: App;
   settings: NamedLinksSettings;
-  fetchTitle: TitleFetcher;
+  fetchPageInfo: PageInfoFetcher;
 }
 
 interface PendingTitle {
@@ -109,17 +116,36 @@ export class Linker {
    * finished link goes through here; the request and the fallback for a
    * missing title use the URL as it came.
    */
-  link(url: string, title: string, titleIsMarkdown = false): string {
+  link(
+    url: string,
+    title: string,
+    titleIsMarkdown = false,
+    page: PageInfo | null = null
+  ): string {
     return renderLink(templateFor(this.settings), {
       url: this.settings.decodeUrls ? decodeUrlForDisplay(url) : url,
       title,
       titleIsMarkdown,
+      author: page?.author,
+      site: page?.siteName,
+      description: page?.description,
+      section: page?.section,
+      formatDate: (format) => moment().format(format),
     });
   }
 
-  /** Whether the link format shows a title, and so whether to fetch one. */
+  /** Whether the link format shows a title. */
   get wantsTitle(): boolean {
     return needsTitle(templateFor(this.settings));
+  }
+
+  /**
+   * Whether the link format shows anything read from the page, and so
+   * whether to fetch it. A format of only `{url}`, `{domain}` and `{date}`
+   * is written straight away.
+   */
+  get wantsPageInfo(): boolean {
+    return needsPageInfo(templateFor(this.settings));
   }
 
   /**
@@ -189,8 +215,9 @@ export class Linker {
           ? this.link(url, hostnameOf(url))
           : token;
       }
-      // A format without the title is finished straight away, unfetched.
-      if (!this.wantsTitle) return this.link(url, '');
+      // A format showing nothing from the page is finished straight away,
+      // unfetched.
+      if (!this.wantsPageInfo) return this.link(url, '');
       if (copiedTitle && urls.length === 1) {
         return this.link(
           url,
@@ -324,12 +351,13 @@ export class Linker {
     file: TFile | null,
     item: PendingTitle
   ): Promise<void> {
-    let title: string | null = null;
+    let page: PageInfo | null = null;
     try {
-      title = await this.host.fetchTitle(item.url);
+      page = await this.host.fetchPageInfo(item.url);
     } catch (e) {
       console.error('Named Links: fetching a title failed', e);
     }
+    const title = page?.title ?? null;
 
     if (title === null) {
       new Notice(t().notices.noTitle(hostnameOf(item.url)));
@@ -340,7 +368,9 @@ export class Linker {
         ? item.fallback
         : this.link(
             stripAngles(destination),
-            readableTitle(title, this.settings.maxTitleLength)
+            readableTitle(title, this.settings.maxTitleLength),
+            false,
+            page
           );
 
     // The editor that took the paste, if it is still on screen, then any
@@ -412,7 +442,7 @@ export class Linker {
 
     const from = { line: cursor.line, ch: link.start };
     const to = { line: cursor.line, ch: link.end };
-    if (!this.wantsTitle) {
+    if (!this.wantsPageInfo) {
       editor.replaceRange(this.link(url, ''), from, to);
       return;
     }
@@ -463,7 +493,7 @@ export class Linker {
           from: { line: ln, ch: link.start },
           to: { line: ln, ch: link.end },
         };
-        if (!this.wantsTitle) {
+        if (!this.wantsPageInfo) {
           changes.push({ ...range, text: this.link(url, '') });
           continue;
         }

@@ -1,28 +1,78 @@
 import assert from 'node:assert/strict';
 
 import { API_VERSION, ApiHost, apiUrl, createApi } from '../../src/api';
-import { needsTitle, renderLink, templateFor } from '../../src/linkFormat';
+import {
+  needsPageInfo,
+  needsTitle,
+  renderLink,
+  templateFor,
+} from '../../src/linkFormat';
+import type { PageInfo } from '../../src/scraper';
 import { DEFAULT_SETTINGS, NamedLinksSettings } from '../../src/settings';
 
 /** A host that renders links like the plugin and counts its lookups. */
 function fakeHost(
   overrides: Partial<NamedLinksSettings> = {},
-  titles: Record<string, string | null> = {}
+  titles: Record<string, string | Partial<PageInfo> | null> = {}
 ) {
   const settings = { ...DEFAULT_SETTINGS, ...overrides };
   const lookups: string[] = [];
   const host: ApiHost = {
     settings: () => settings,
-    fetchTitle: (url) => {
+    fetchPageInfo: (url) => {
       lookups.push(url);
-      if (url in titles) return Promise.resolve(titles[url]);
-      return Promise.reject(new Error('unexpected lookup ' + url));
+      if (!(url in titles)) {
+        return Promise.reject(new Error('unexpected lookup ' + url));
+      }
+      const found = titles[url];
+      if (found === null) return Promise.resolve(null);
+      const page: PageInfo = {
+        siteName: null,
+        author: null,
+        description: null,
+        section: null,
+        ...(typeof found === 'string' ? { title: found } : found),
+      } as PageInfo;
+      return Promise.resolve(page);
     },
-    link: (url, title) => renderLink(templateFor(settings), { url, title }),
+    link: (url, title, page) =>
+      renderLink(templateFor(settings), {
+        url,
+        title,
+        author: page?.author,
+        site: page?.siteName,
+        description: page?.description,
+        section: page?.section,
+      }),
     wantsTitle: () => needsTitle(templateFor(settings)),
+    wantsPageInfo: () => needsPageInfo(templateFor(settings)),
   };
   return { api: createApi(host), lookups, settings };
 }
+
+describe('getLink with page placeholders', () => {
+  it('fills the format from the same lookup as the title', async () => {
+    const url = 'https://example.com/v';
+    const { api, lookups } = fakeHost(
+      {
+        linkFormat: 'custom',
+        customLinkFormat: '[{title}]({url}) by {author}',
+      },
+      { [url]: { title: 'A video', author: 'A channel' } }
+    );
+    assert.equal(await api.getLink(url), `[A video](${url}) by A channel`);
+    assert.deepEqual(lookups, [url]);
+  });
+
+  it('fetches for a format that shows no title but shows the author', async () => {
+    const url = 'https://example.com/v';
+    const { api } = fakeHost(
+      { linkFormat: 'custom', customLinkFormat: '[{author}]({url})' },
+      { [url]: { title: 'A video', author: 'A channel' } }
+    );
+    assert.equal(await api.getLink(url), `[A channel](${url})`);
+  });
+});
 
 describe('apiUrl', () => {
   it('reads URLs as a paste would', () => {

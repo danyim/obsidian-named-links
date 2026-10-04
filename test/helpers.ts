@@ -213,6 +213,7 @@ export async function resetPlugin(): Promise<void> {
       decodeUrls: false,
     };
     p.requestTimeoutMs = 15000;
+    p.oEmbedProviders = undefined;
     await p.saveSettings();
   });
 }

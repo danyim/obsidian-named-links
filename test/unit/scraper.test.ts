@@ -4,8 +4,11 @@ import {
   HttpRequest,
   HttpResponse,
   decodeHtml,
+  extractPageInfo,
+  extractSection,
   extractSiteName,
   extractTitle,
+  fetchPageInfo,
   fetchTitle,
   twitterProxyUrl,
 } from '../../src/scraper';
@@ -54,6 +57,131 @@ function concat(...parts: (string | Uint8Array)[]): Uint8Array {
   }
   return out;
 }
+
+describe('extractPageInfo', () => {
+  const head = (meta: string) =>
+    `<html><head><title>T</title>${meta}</head><body></body></html>`;
+
+  it('has no info for a page without a title', () => {
+    assert.equal(extractPageInfo('<html><body>hi</body></html>'), null);
+  });
+
+  it('reads the author from the author meta tag', () => {
+    assert.equal(
+      extractPageInfo(head('<meta name="author" content="Ada">'))?.author,
+      'Ada'
+    );
+  });
+
+  it("reads article:author, but not when it's a profile URL", () => {
+    assert.equal(
+      extractPageInfo(head('<meta property="article:author" content="Ada">'))
+        ?.author,
+      'Ada'
+    );
+    assert.equal(
+      extractPageInfo(
+        head(
+          '<meta property="article:author" content="https://example.com/ada">'
+        )
+      )?.author,
+      null
+    );
+  });
+
+  it('prefers the Open Graph description, then the standard one', () => {
+    assert.equal(
+      extractPageInfo(
+        head(
+          '<meta name="description" content="Plain"><meta property="og:description" content="OG">'
+        )
+      )?.description,
+      'OG'
+    );
+    assert.equal(
+      extractPageInfo(head('<meta name="description" content="Plain">'))
+        ?.description,
+      'Plain'
+    );
+    assert.equal(
+      extractPageInfo(head('<meta name="twitter:description" content="Card">'))
+        ?.description,
+      'Card'
+    );
+  });
+
+  it('leaves out what the page is silent about', () => {
+    assert.deepEqual(extractPageInfo(head('')), {
+      title: 'T',
+      siteName: null,
+      author: null,
+      description: null,
+      section: null,
+    });
+  });
+});
+
+describe('extractSection', () => {
+  const body = (html: string) => `<html><body>${html}</body></html>`;
+
+  it('reads the heading with the id', () => {
+    assert.equal(
+      extractSection(body('<h2 id="install">Install</h2>'), 'install'),
+      'Install'
+    );
+  });
+
+  it('reads the heading an anchor sits in, holds, or comes before', () => {
+    assert.equal(
+      extractSection(body('<h3><a id="a"></a>Inside</h3>'), 'a'),
+      'Inside'
+    );
+    assert.equal(
+      extractSection(
+        body('<section id="s"><h2>Held</h2><p>x</p></section>'),
+        's'
+      ),
+      'Held'
+    );
+    assert.equal(
+      extractSection(body('<a name="old"></a><h2>After</h2>'), 'old'),
+      'After'
+    );
+  });
+
+  it('matches a percent-encoded fragment', () => {
+    assert.equal(
+      extractSection(body('<h2 id="über">Über</h2>'), '%C3%BCber'),
+      'Über'
+    );
+  });
+
+  it('matches heading text when headings carry no id (upstream #130)', () => {
+    assert.equal(
+      extractSection(
+        body('<h2>Link to a heading in a note</h2>'),
+        'Link+to+a+heading+in+a+note'
+      ),
+      'Link to a heading in a note'
+    );
+  });
+
+  it('drops permalink marks around the heading text', () => {
+    assert.equal(
+      extractSection(body('<h2 id="x"># Setup ¶</h2>'), 'x'),
+      'Setup'
+    );
+  });
+
+  it('has nothing for a missing target or a long non-heading one', () => {
+    assert.equal(extractSection(body('<h2 id="a">A</h2>'), 'b'), null);
+    assert.equal(
+      extractSection(body(`<div id="d">${'word '.repeat(60)}</div>`), 'd'),
+      null
+    );
+    assert.equal(extractSection(body('<h2 id="a">A</h2>'), ''), null);
+  });
+});
 
 describe('extractTitle', () => {
   it('reads <title>', () => {
@@ -243,30 +371,73 @@ describe('fetchTitle', () => {
     assert.match(requests[0].url, /url=https%3A%2F%2Fyoutu\.be%2FdQw4w9WgXcQ/);
   });
 
-  it("reports the page's declared site name", async () => {
+  it('reports what the page says about itself', async () => {
     const { http } = fakeHttp(() => ({
-      html: '<head><title>A - Site</title><meta property="og:site_name" content="Site"></head>',
+      html: `<head><title>A - Site</title>
+        <meta property="og:site_name" content="Site">
+        <meta name="author" content="Ada Lovelace">
+        <meta property="og:description" content="  About
+          the page ">
+        </head><body><h2 id="usage">Usage ¶</h2></body>`,
     }));
-    const names: string[] = [];
-    const title = await fetchTitle('https://example.com', {
-      http,
-      onSiteName: (name) => names.push(name),
-    });
-    assert.equal(title, 'A - Site');
-    assert.deepEqual(names, ['Site']);
+    assert.deepEqual(
+      await fetchPageInfo('https://example.com/docs#usage', { http }),
+      {
+        title: 'A - Site',
+        siteName: 'Site',
+        author: 'Ada Lovelace',
+        description: 'About the page',
+        section: 'Usage',
+      }
+    );
   });
 
-  it("reports an oEmbed provider's name", async () => {
+  it("reports an oEmbed provider's name, author and description", async () => {
     const { http } = fakeHttp(() => ({
       headers: { 'content-type': 'application/json' },
-      html: JSON.stringify({ title: 'A video', provider_name: 'YouTube' }),
+      html: JSON.stringify({
+        title: 'A video',
+        provider_name: 'YouTube',
+        author_name: 'A Channel',
+        description: 'What it is',
+      }),
     }));
-    const names: string[] = [];
-    await fetchTitle('https://youtu.be/x', {
-      http,
-      onSiteName: (name) => names.push(name),
+    assert.deepEqual(await fetchPageInfo('https://youtu.be/x', { http }), {
+      title: 'A video',
+      siteName: 'YouTube',
+      author: 'A Channel',
+      description: 'What it is',
+      section: null,
     });
-    assert.deepEqual(names, ['YouTube']);
+  });
+
+  it('uses oEmbed providers passed in place of the built-in ones', async () => {
+    const { http, requests } = fakeHttp(() => ({
+      headers: { 'content-type': 'application/json' },
+      html: JSON.stringify({ title: 'Local video' }),
+    }));
+    const info = await fetchPageInfo('http://127.0.0.1:1/video', {
+      http,
+      oEmbedProviders: [
+        { pattern: /\/video$/, endpoint: 'http://127.0.0.1:1/oembed' },
+      ],
+    });
+    assert.equal(info?.title, 'Local video');
+    assert.match(requests[0].url, /^http:\/\/127\.0\.0\.1:1\/oembed\?/);
+  });
+
+  it('names a file but knows nothing else about it', async () => {
+    const { http } = fakeHttp(() => ({}));
+    assert.deepEqual(
+      await fetchPageInfo('https://example.com/report.pdf', { http }),
+      {
+        title: 'report.pdf',
+        siteName: null,
+        author: null,
+        description: null,
+        section: null,
+      }
+    );
   });
 
   it('falls back to the page when oEmbed fails', async () => {

@@ -58,9 +58,27 @@ None has a default hotkey; set one under Settings → Hotkeys.
 | Markdown link | `[Example Domain](https://example.com)` |
 | Markdown link with a hover title | `[Example Domain](https://example.com "Example Domain")` |
 | HTML link | `<a href="https://example.com">Example Domain</a>` |
-| Custom | Your own template using `{title}`, `{url}` and `{domain}` |
+| Custom | Your own template, using the placeholders below |
 
-For example, `[source]({url})` writes `[source](https://example.com)` without fetching anything, and `<a href="{url}" target="_blank">{title}</a>` opens in a new tab. Each value is escaped for where it sits in the template, so a title can't break the link.
+| Placeholder | Is |
+| --- | --- |
+| `{title}` | The page's title |
+| `{url}`, `{domain}` | The link's URL, and its host without `www.` |
+| `{author}` | A video's channel, or the page's author |
+| `{site}` | The site's name, such as `YouTube` |
+| `{description}` | The page's description |
+| `{section}` | The heading a `#fragment` in the URL points to |
+| `{date}`, `{date:FORMAT}` | Today, as `YYYY-MM-DD` or a [moment.js format](https://momentjs.com/docs/#/displaying/format/) |
+
+For example:
+
+| Template | Result |
+| --- | --- |
+| `[{title} - {author}]({url})` | `[A video - A Channel](https://youtu.be/…)` |
+| `[{title} › {section}]({url})` | `[Internal links › Link to a heading](https://help.obsidian.md/…#…)` |
+| `[source]({url}) ({date})` | `[source](https://example.com) (2026-10-03)`, with nothing fetched |
+
+A value the page doesn't have is left out, along with the separator next to it (` - `, ` | `, `: ` and the like) or the parentheses around it, so `[{title} - {author}]({url})` on a page with no author is just `[Title](url)`. Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
 
 ### Decoding URLs
 
