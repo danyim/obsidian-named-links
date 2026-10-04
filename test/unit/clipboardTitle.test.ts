@@ -137,13 +137,26 @@ describe('usefulLinkText', () => {
     'example.com',
     'www.example.com',
     'https://elsewhere.example/page',
+    // Another site's URL written without a scheme.
+    'elsewhere.example/page',
     'here',
     'Click here!',
     'Read more…',
     'link',
+    // Punctuation separates words rather than joining them.
+    'click-here',
+    'read_more',
+    // Nothing but punctuation.
+    '...',
+    '→',
   ]) {
     it(`falls back to fetching for ${JSON.stringify(text)}`, () =>
       assert.equal(usefulLinkText(text, url), null));
+  }
+
+  for (const text of ['Node.js', 'ASP.NET Core', 'example.org']) {
+    it(`keeps a dotted name like ${JSON.stringify(text)}`, () =>
+      assert.equal(usefulLinkText(text, url), text));
   }
 });
 

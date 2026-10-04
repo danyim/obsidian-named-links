@@ -68,9 +68,11 @@ const GENERIC_TEXT = new Set([
  * fetching one:
  *
  * - empty or only whitespace;
- * - a URL, including the URL itself with or without its scheme or `www.`;
+ * - a URL, including the URL itself with or without its scheme or `www.`,
+ *   and one written without a scheme, like `example.org/page`;
  * - only the host name, with or without `www.`;
- * - generic text that names nothing, like "here" or "read more".
+ * - generic text that names nothing, like "here" or "read-more", or text
+ *   that is nothing but punctuation.
  */
 export function usefulLinkText(text: string, url: string): string | null {
   const title = cleanTitle(text);
@@ -85,12 +87,19 @@ export function usefulLinkText(text: string, url: string): string | null {
   if (bare(title) === bare(url)) return null;
   if (bare(title) === bare(hostnameOf(url))) return null;
   if (isUrl(title)) return null;
+  // A URL written without its scheme. Only with a path after the host, so a
+  // dotted name like "Node.js" or "ASP.NET" is still a usable title.
+  if (/^[^\s/]+\.[^\s/]+\/\S*$/.test(title) && isUrl(`https://${title}`)) {
+    return null;
+  }
 
+  // Punctuation separates words rather than joining them, so "read-more"
+  // reads as "read more", and text that is only punctuation is nothing.
   const words = title
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
-  if (GENERIC_TEXT.has(words)) return null;
+  if (words === '' || GENERIC_TEXT.has(words)) return null;
 
   return title;
 }
