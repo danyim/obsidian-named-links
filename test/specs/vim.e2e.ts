@@ -45,19 +45,24 @@ async function openVimNote(content: string): Promise<void> {
 /**
  * Waits until the active editor has vim attached and focused. A note opened
  * moments ago may not have it yet, and keys pressed before then are typed
- * into the note as text.
+ * into the note as text. Obsidian can also read its config back from disk
+ * while a spec runs and turn vim mode off again, which on a loaded machine
+ * left vim unattached for good (seen on 1.13.4 with every spec file running),
+ * so the setting is put back whenever it reads as off.
  */
 async function waitForVim(): Promise<void> {
   await browser.waitUntil(
     () =>
       browser.executeObsidian(({ app, obsidian }) => {
+        const vault = (app as any).vault;
+        if (!vault.getConfig('vimMode')) vault.setConfig('vimMode', true);
         const view = app.workspace.getActiveViewOfType(obsidian.MarkdownView);
         if (!view) return false;
         const cm = (view.editor as any).cm;
         view.editor.focus();
         return !!cm?.cm?.state?.vim && !!cm.hasFocus;
       }),
-    { timeout: 5000, interval: 100, timeoutMsg: 'vim never attached' }
+    { timeout: 15000, interval: 100, timeoutMsg: 'vim never attached' }
   );
 }
 
