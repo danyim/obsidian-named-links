@@ -49,11 +49,9 @@ and on the emulated phone UI, with the settings in `test/capture/readme.capture.
 filled in to show the title clean-up in use.
 
 Each image is the whole settings tab, scrolled and stitched together one
-window at a time, in light mode on the left and dark mode on the right. The
-two halves meet at a seam whose gutter takes each half's own background
-color. Like the tests, it needs a display (handled automatically on Linux),
-and it renders in Inter, failing rather than falling back to another
-typeface so the images match between machines:
+window at a time, rendered in dark mode. Like the tests, it needs a display
+(handled automatically on Linux), and it renders in Inter, failing rather
+than falling back to another typeface so the images match between machines:
 
 ```bash
 sudo apt-get install fonts-inter

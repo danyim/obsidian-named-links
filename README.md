@@ -33,7 +33,7 @@ None has a default hotkey; set one under Settings → Hotkeys.
 
 ## Settings
 
-![The Named Links settings tab in light and dark mode](screenshots/settings.png)
+![The Named Links settings tab in dark mode](screenshots/settings.png)
 
 | Setting | Default | |
 | --- | --- | --- |
