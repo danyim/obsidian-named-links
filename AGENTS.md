@@ -171,6 +171,9 @@ Specific to this plugin:
 **Do**
 
 - Keep command ids and the plugin `id` stable.
+- Keep the scripting API in `src/api.ts` backward compatible: add methods
+  freely, but bump `API_VERSION` for anything that removes, renames or
+  changes what an existing method takes or returns.
 - Run `npm run lint`, `npm run check-types` and `npm run test:unit` before
   considering a change done; run the e2e suite for anything touching what gets
   inserted into the editor or the settings tab.

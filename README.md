@@ -100,6 +100,22 @@ github.com: /^GitHub - / =>
 
 A pattern is literal text unless written `/pattern/flags`, which makes it a regular expression (add `g` to replace every match, and use `$1` for groups). An empty replacement deletes the match. Invalid lines are skipped and flagged in the settings tab, and rules never leave a title empty.
 
+## Scripting
+
+Other plugins and scripts can fetch titles through `app.plugins.plugins['named-links'].api`, using your settings (clean-up, link format, excluded sites). In a Templater template, this turns the selected URL into a titled link:
+
+```
+<% await app.plugins.plugins['named-links'].api.getLink(tp.file.selection()) %>
+```
+
+| Method | Returns |
+| --- | --- |
+| `getTitle(url)` | The cleaned-up title, not escaped, or `null` if there's none or the site is excluded. |
+| `getLink(url)` | The link a paste would write, or the URL as given if no title is found. |
+| `formatLink(url, title)` | Your link format applied to a title you already have. Nothing is fetched. |
+
+None of them throw; bad input gets `null` or the input back. `api.version` is `1` and only goes up for a breaking change (a method removed, renamed or changed in what it takes or returns); new methods don't change it. The types are in [src/api.ts](src/api.ts).
+
 ## Moving over from Auto Link Title
 
 Named Links has its own plugin id, so settings don't carry over by themselves. If Auto Link Title's are still in your vault, the settings tab offers to import them. Disable Auto Link Title once you've switched; while both are on, whichever runs first takes each paste.

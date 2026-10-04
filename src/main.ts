@@ -9,6 +9,7 @@ import {
   getLanguage,
 } from 'obsidian';
 
+import { NamedLinksApi, createApi } from './api';
 import { cleanupTitle } from './cleanup';
 import { obsidianHttpClient } from './http';
 import { t } from './lang';
@@ -38,6 +39,12 @@ function fileOf(info: MarkdownView | MarkdownFileInfo | null): TFile | null {
 export default class NamedLinksPlugin extends Plugin {
   settings: NamedLinksSettings;
   linker: Linker;
+
+  /**
+   * For other plugins and scripts, at
+   * `app.plugins.plugins['named-links'].api`. See src/api.ts.
+   */
+  api: NamedLinksApi;
 
   /**
    * Whether this vault still holds Auto Link Title's settings, so the
@@ -92,6 +99,12 @@ export default class NamedLinksPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.linker = new Linker(this);
+    this.api = createApi({
+      settings: () => this.settings,
+      fetchTitle: (url) => this.fetchTitle(url),
+      link: (url, title) => this.linker.link(url, title),
+      wantsTitle: () => this.linker.wantsTitle,
+    });
 
     this.addSettingTab(new NamedLinksSettingTab(this.app, this));
 
