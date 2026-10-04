@@ -1,5 +1,6 @@
 import { browser } from '@wdio/globals';
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import { obsidianPage } from 'wdio-obsidian-service';
 
@@ -327,4 +328,37 @@ export async function renderedLinks(markdown: string): Promise<RenderedLink[]> {
       component.unload();
     }
   }, markdown);
+}
+
+const CLIPBOARD_LOCK_STALE_MS = 30 * 1000;
+
+/**
+ * Runs `fn` while holding the system clipboard. Specs that press real keys
+ * paste from it, and the wdio workers running in parallel share one display,
+ * and so one clipboard: without this, a worker can paste the URL another
+ * worker just copied. The lock is a directory, since creating one is atomic
+ * across processes, and one older than CLIPBOARD_LOCK_STALE_MS is taken as
+ * left behind by a worker that died holding it.
+ */
+export async function withSystemClipboard<T>(fn: () => Promise<T>): Promise<T> {
+  const display = (process.env.DISPLAY ?? 'default').replace(/[^\w]/g, '_');
+  const lock = path.join(os.tmpdir(), `named-links-clipboard-${display}.lock`);
+  for (;;) {
+    try {
+      await fs.mkdir(lock);
+      break;
+    } catch {
+      const stat = await fs.stat(lock).catch(() => null);
+      if (stat && Date.now() - stat.mtimeMs > CLIPBOARD_LOCK_STALE_MS) {
+        await fs.rm(lock, { recursive: true, force: true });
+        continue;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await fs.rm(lock, { recursive: true, force: true });
+  }
 }
