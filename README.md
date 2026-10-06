@@ -32,7 +32,7 @@ Set **Link format** to Custom and write a template. These are real results:
 | --- | --- | --- |
 | `[{title}]({url}) (accessed {date})` | `https://obsidian.md/` | `[Obsidian - Sharpen your thinking](https://obsidian.md/) (accessed 2026-10-04)` |
 | `[{title} ({author})]({url})` | a YouTube video | `[The essence of calculus (3Blue1Brown)](https://www.youtube.com/watch?v=WUvTyaaNkzM)` |
-| `[{title}: {section}]({url})` | `https://en.wikipedia.org/wiki/Markdown#History` | `[Markdown: History](https://en.wikipedia.org/wiki/Markdown#History)` |
+| `[{title} › {section}]({url})` | `https://en.wikipedia.org/wiki/Markdown#History` | `[Markdown › History](https://en.wikipedia.org/wiki/Markdown#History)` |
 | `[{title}]({url}) - {description}` | `https://obsidian.md/` | `[Obsidian - Sharpen your thinking](https://obsidian.md/) - The free and flexible app for your private thoughts.` |
 
 A value the page doesn't have is dropped along with the separator or parentheses next to it, so the same Wikipedia template on a URL without `#History` gives `[Markdown](…)`. The Wikipedia example also has **Remove the site name** on.
