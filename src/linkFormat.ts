@@ -23,8 +23,9 @@
  *
  * A `{?…}` group, as in `{title}{? | {author}}` (#20), is written only when
  * every placeholder in it has a value. Square brackets would have been the
- * familiar syntax, but they're already markdown link text here. A group stays
- * within one of the parts above, so its values are escaped as usual.
+ * familiar syntax, but they're already markdown link text here. A group ends
+ * in the same part it starts in, so writing or dropping it can't leave a
+ * bracket, quote or tag open, and its values are escaped as usual.
  */
 import { escapeMarkdown } from './title';
 import { linkDestination } from './url';
@@ -89,8 +90,13 @@ interface Group {
   closed: boolean;
   /** Whether another `{?` opened inside it. */
   nested: boolean;
-  /** Whether it starts in one part of the link and ends in another. */
-  crossesParts: boolean;
+  /** The part of the link it starts in, and the quote, if it's quoted. */
+  start: { context: Context; quote: string };
+  /**
+   * Whether it ends in another part, or in another quote, so writing or
+   * dropping it would change what the rest of the template is part of.
+   */
+  endsElsewhere: boolean;
 }
 
 interface Parsed {
@@ -141,7 +147,12 @@ function parse(template: string): Parsed {
     if (ch === '{' && template[i + 1] === '?') {
       if (group === undefined) {
         flush();
-        groups.push({ closed: false, nested: false, crossesParts: false });
+        groups.push({
+          closed: false,
+          nested: false,
+          start: { context, quote },
+          endsElsewhere: false,
+        });
         group = groups.length - 1;
         i++;
         continue;
@@ -150,7 +161,10 @@ function parse(template: string): Parsed {
       groups[group].nested = true;
     } else if (ch === '}' && group !== undefined) {
       flush();
+      const { start } = groups[group];
       groups[group].closed = true;
+      groups[group].endsElsewhere =
+        start.context !== context || start.quote !== quote;
       group = undefined;
       continue;
     }
@@ -199,12 +213,9 @@ function parse(template: string): Parsed {
         }
         break;
     }
-    if (context !== before) {
-      if (group !== undefined) groups[group].crossesParts = true;
-      if (literal !== '') {
-        pieces.push({ literal, context: before, group });
-        literal = '';
-      }
+    if (context !== before && literal !== '') {
+      pieces.push({ literal, context: before, group });
+      literal = '';
     }
   }
   flush();
@@ -218,7 +229,7 @@ export type TemplateError =
   | { code: 'emptyDateFormat' }
   | { code: 'unclosedGroup' }
   | { code: 'nestedGroup' }
-  | { code: 'groupAcrossParts' }
+  | { code: 'groupEndsElsewhere' }
   | { code: 'groupWithoutPlaceholder' };
 
 /** `{name}`, or `{name:format}`, as the template wrote it. */
@@ -250,7 +261,7 @@ export function validateTemplate(template: string): TemplateError | null {
   for (const [index, group] of groups.entries()) {
     if (group.nested) return { code: 'nestedGroup' };
     if (!group.closed) return { code: 'unclosedGroup' };
-    if (group.crossesParts) return { code: 'groupAcrossParts' };
+    if (group.endsElsewhere) return { code: 'groupEndsElsewhere' };
     // With nothing to go missing, it would always be written.
     if (!pieces.some((piece) => piece.group === index && piece.name)) {
       return { code: 'groupWithoutPlaceholder' };

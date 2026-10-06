@@ -271,6 +271,18 @@ describe('validateTemplate', () => {
     assert.equal(validateTemplate('[{title}]({?{url}})'), null);
   });
 
+  it('accepts a group that passes through a quote or tag and back', () => {
+    assert.equal(validateTemplate('[{title}]({url}{? "{description}"})'), null);
+    assert.equal(
+      validateTemplate('<a href="{url}"{? title="{description}"}>{title}</a>'),
+      null
+    );
+    assert.equal(
+      validateTemplate('[{title}]({url}){? by <b>{author}</b>}'),
+      null
+    );
+  });
+
   it('rejects a group that is never closed', () => {
     assert.deepEqual(validateTemplate('[{title}]({url}){? via {site}'), {
       code: 'unclosedGroup',
@@ -284,13 +296,18 @@ describe('validateTemplate', () => {
     );
   });
 
-  it('rejects a group that spans two parts of the link', () => {
-    assert.deepEqual(validateTemplate('{?[{title}]({url})}'), {
-      code: 'groupAcrossParts',
+  it('rejects a group that ends in another part of the link', () => {
+    assert.deepEqual(validateTemplate('{?[{title}]({url}}'), {
+      code: 'groupEndsElsewhere',
     });
-    assert.deepEqual(validateTemplate('[{title}{? | {author}]({url})}'), {
-      code: 'groupAcrossParts',
+    assert.deepEqual(validateTemplate('[{title}{? | {author}]({url}})'), {
+      code: 'groupEndsElsewhere',
     });
+    // Back in a link title, but one in other quotes.
+    assert.deepEqual(
+      validateTemplate(`[{title}]({url} "{title}{?" '{author}}')`),
+      { code: 'groupEndsElsewhere' }
+    );
   });
 
   it('rejects a group without a placeholder', () => {
@@ -528,6 +545,22 @@ describe('{?…} groups', () => {
       render('<a href="{url}" title="{title}{? by {author}}">{title}</a>'),
       `<a href="${url}" title="Title">Title</a>`
     );
+  });
+
+  it('can hold a whole link title or HTML attribute', () => {
+    const hover = '[{title}]({url}{? "{description}"})';
+    assert.equal(
+      render(hover, { description: 'About "it"' }),
+      `[Title](${url} "About \\"it\\"")`
+    );
+    assert.equal(render(hover), `[Title](${url})`);
+
+    const html = '<a href="{url}"{? title="{description}"}>{title}</a>';
+    assert.equal(
+      render(html, { description: 'A <b>' }),
+      `<a href="${url}" title="A &lt;b&gt;">Title</a>`
+    );
+    assert.equal(render(html), `<a href="${url}">Title</a>`);
   });
 
   it('still lose a separator to an empty value outside them', () => {

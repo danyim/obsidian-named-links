@@ -120,8 +120,8 @@ const ja: Strings = {
       unclosedGroup:
         '{? は {title}{? | {author}} のように } で閉じてください。',
       nestedGroup: '{?…} の中に別の {?…} は入れられません。',
-      groupAcrossParts:
-        '{?…} はリンクの1つの部分（テキスト、URL、タイトル）の中に収めてください。',
+      groupEndsElsewhere:
+        '{?…} は、始まったのと同じリンクの部分（テキスト、URL、引用符で囲んだタイトルなど）の中で閉じてください。そうすれば省いてもリンクが壊れません。',
       groupWithoutPlaceholder:
         '{?…} には {? | {author}} のようにプレースホルダーを入れてください。中の値がすべてある場合だけ書き込まれます。',
     },
