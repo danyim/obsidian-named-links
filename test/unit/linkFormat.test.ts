@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_TEMPLATE,
   LINK_FORMATS,
+  LinkValues,
   escapeHtml,
   localIsoDate,
   needsPageInfo,
@@ -257,6 +258,87 @@ describe('validateTemplate', () => {
       name: 'title:upper',
     });
   });
+
+  it('accepts {?…} groups', () => {
+    assert.equal(
+      validateTemplate('[{title}{? › {section}}{? | {author}}]({url})'),
+      null
+    );
+    assert.equal(
+      validateTemplate('[{title}]({url} "{title}{? by {author}}")'),
+      null
+    );
+    assert.equal(validateTemplate('[{title}]({?{url}})'), null);
+  });
+
+  it('accepts a group that passes through a quote or tag and back', () => {
+    assert.equal(validateTemplate('[{title}]({url}{? "{description}"})'), null);
+    assert.equal(
+      validateTemplate('<a href="{url}"{? title="{description}"}>{title}</a>'),
+      null
+    );
+    assert.equal(
+      validateTemplate('[{title}]({url}){? by <b>{author}</b>}'),
+      null
+    );
+  });
+
+  it('rejects a group that is never closed', () => {
+    assert.deepEqual(validateTemplate('[{title}]({url}){? via {site}'), {
+      code: 'unclosedGroup',
+    });
+  });
+
+  it('rejects a group inside another', () => {
+    assert.deepEqual(
+      validateTemplate('[{title}{? ({author}{? - {site}})}]({url})'),
+      { code: 'nestedGroup' }
+    );
+  });
+
+  it('rejects a group that ends in another part of the link', () => {
+    assert.deepEqual(validateTemplate('{?[{title}]({url}}'), {
+      code: 'groupUnbalanced',
+    });
+    assert.deepEqual(validateTemplate('[{title}{? | {author}]({url}})'), {
+      code: 'groupUnbalanced',
+    });
+    // Back in a link title, but one in other quotes.
+    assert.deepEqual(
+      validateTemplate(`[{title}]({url} "{title}{?" '{author}}')`),
+      { code: 'groupUnbalanced' }
+    );
+  });
+
+  it('rejects a group that opens a bracket it does not close', () => {
+    // Dropped, it would leave "](url)".
+    assert.deepEqual(validateTemplate('{?[{author}}]({url})'), {
+      code: 'groupUnbalanced',
+    });
+    assert.deepEqual(validateTemplate('[{title}]({url}{?({author}})'), {
+      code: 'groupUnbalanced',
+    });
+  });
+
+  it('rejects a group that closes a bracket it did not open', () => {
+    assert.deepEqual(validateTemplate('[{title}{? | {author}]}({url})'), {
+      code: 'groupUnbalanced',
+    });
+  });
+
+  it('accepts a whole link, or an escaped bracket, in a group', () => {
+    assert.equal(validateTemplate('{title}{? [{author}]({url})}'), null);
+    assert.equal(validateTemplate('[{title}]({url}){? \\[{author}}'), null);
+  });
+
+  it('rejects a group without a placeholder', () => {
+    assert.deepEqual(validateTemplate('[{title}{? - }]({url})'), {
+      code: 'groupWithoutPlaceholder',
+    });
+    assert.deepEqual(validateTemplate('[{title}{?}]({url})'), {
+      code: 'groupWithoutPlaceholder',
+    });
+  });
 });
 
 describe('needsPageInfo', () => {
@@ -427,6 +509,93 @@ describe('empty values', () => {
       render('<a href="{url}" data-x="- {author}">{title}</a>'),
       '<a href="https://example.com" data-x="- ">Title</a>'
     );
+  });
+});
+
+describe('{?…} groups', () => {
+  const url = 'https://example.com';
+  const render = (template: string, more: Partial<LinkValues> = {}) =>
+    renderLink(template, { title: 'Title', url, ...more });
+
+  it('are written when their values are there', () => {
+    assert.equal(
+      render('[{title}{? | {author}}]({url})', { author: 'Ann' }),
+      `[Title | Ann](${url})`
+    );
+  });
+
+  it('are dropped whole when a value is missing', () => {
+    assert.equal(render('[{title}{? | {author}}]({url})'), `[Title](${url})`);
+    assert.equal(
+      render('[{title}{? ({author}, {site})}]({url})', { author: 'Ann' }),
+      `[Title](${url})`
+    );
+  });
+
+  it('give each optional value its own separator (#20)', () => {
+    const template = '[{title}{? › {section}}{? | {author}}]({url})';
+    assert.equal(render(template, { author: 'Ann' }), `[Title | Ann](${url})`);
+    assert.equal(
+      render(template, { section: 'Usage' }),
+      `[Title › Usage](${url})`
+    );
+    assert.equal(
+      render(template, { section: 'Usage', author: 'Ann' }),
+      `[Title › Usage | Ann](${url})`
+    );
+  });
+
+  it('keep any text, not just separators', () => {
+    assert.equal(
+      render('[{title}]({url}){? (via {site})}', { site: 'YouTube' }),
+      `[Title](${url}) (via YouTube)`
+    );
+    assert.equal(render('[{title}]({url}){? (via {site})}'), `[Title](${url})`);
+  });
+
+  it('escape their values for where they sit', () => {
+    assert.equal(
+      render('[{title}{? | {author}}]({url})', { author: 'A*B' }),
+      `[Title | A\\*B](${url})`
+    );
+    assert.equal(
+      render('[{title}]({url} "{title}{? by {author}}")', { author: 'A "B"' }),
+      `[Title](${url} "Title by A \\"B\\"")`
+    );
+    assert.equal(
+      render('<a href="{url}" title="{title}{? by {author}}">{title}</a>'),
+      `<a href="${url}" title="Title">Title</a>`
+    );
+  });
+
+  it('can hold a whole link title or HTML attribute', () => {
+    const hover = '[{title}]({url}{? "{description}"})';
+    assert.equal(
+      render(hover, { description: 'About "it"' }),
+      `[Title](${url} "About \\"it\\"")`
+    );
+    assert.equal(render(hover), `[Title](${url})`);
+
+    const html = '<a href="{url}"{? title="{description}"}>{title}</a>';
+    assert.equal(
+      render(html, { description: 'A <b>' }),
+      `<a href="${url}" title="A &lt;b&gt;">Title</a>`
+    );
+    assert.equal(render(html), `<a href="${url}">Title</a>`);
+  });
+
+  it('still lose a separator to an empty value outside them', () => {
+    assert.equal(
+      render('[{site}{? - {author}}]({url})', { author: 'Ann' }),
+      `[Ann](${url})`
+    );
+  });
+
+  it('count their page fields as shown', () => {
+    assert.deepEqual(pageFieldsIn('[{title}{? | {author}}]({url})'), [
+      'author',
+    ]);
+    assert.equal(needsPageInfo('[{domain}{? | {site}}]({url})'), true);
   });
 });
 

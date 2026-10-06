@@ -68,9 +68,68 @@ If Auto Link Title's settings are in your vault, the tab also offers to import t
 
 A custom format must include `{url}`. One that uses only `{url}`, `{domain}` and `{date}` writes the link straight away, with nothing fetched.
 
-A value the page doesn't have is left out, along with the separator before or after it (a hyphen, dash, `|`, `·`, `•`, `:`, `,`, `/`, `›`, `»` or `→`, with its spaces) or the parentheses around it. So `[{title} ({author})]({url})` on a page with no author is just `[Title](url)`. Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
+A value the page doesn't have is left out, along with the separator before or after it (a hyphen, dash, `|`, `·`, `•`, `:`, `,`, `/`, `›`, `»` or `→`, with its spaces) or the parentheses around it. So `[{title} ({author})]({url})` on a page with no author is just `[Title](url)`.
+
+Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
 
 `{section}` is empty on sites that build their pages with JavaScript, such as Obsidian Publish sites, since Named Links reads the page's HTML without running it.
+
+### Optional parts
+
+Separators and parentheses tidy themselves, so `[{title} | {author}]({url})` needs nothing more. When the text around a value is more than that, such as a word, a hover title or an HTML attribute, wrap it in `{?…}`. The group is written when every placeholder inside it has a value, and left out whole when any is missing.
+
+**The author after the link**
+
+```
+[{title}]({url}){? by {author}}
+```
+
+- A YouTube video: `[The essence of calculus](https://www.youtube.com/watch?v=WUvTyaaNkzM) by 3Blue1Brown`
+- A page with no author: `[Obsidian - Sharpen your thinking](https://obsidian.md/)`
+
+**The site, in words**
+
+```
+[{title}{? on {site}}]({url})
+```
+
+- A YouTube video: `[The essence of calculus on YouTube](https://www.youtube.com/watch?v=WUvTyaaNkzM)`
+- A page with no site name: `[Example Domain](https://example.com/)`
+
+**A hover title only when there's a description**
+
+```
+[{title}]({url}{? "{description}"})
+```
+
+- `obsidian.md`: `[Obsidian - Sharpen your thinking](https://obsidian.md/ "The free and flexible app for your private thoughts.")`
+- A page with no description: `[Example Domain](https://example.com/)`, rather than an empty `""`
+
+**The section and the author, each with its own separator**
+
+```
+[{title}{? › {section}}{? | {author}}]({url})
+```
+
+- A `#fragment` on a page with no author: `[Markdown - Wikipedia › History](https://en.wikipedia.org/wiki/Markdown#History)`
+- A video, with no fragment: `[The essence of calculus | 3Blue1Brown](https://www.youtube.com/watch?v=WUvTyaaNkzM)`
+
+**An HTML attribute only when there's a value for it**
+
+```
+<a href="{url}"{? title="{description}"}>{title}</a>
+```
+
+- `obsidian.md`: `<a href="https://obsidian.md/" title="The free and flexible app for your private thoughts.">Obsidian - Sharpen your thinking</a>`
+- A page with no description: `<a href="https://example.com/">Example Domain</a>`
+
+The settings tab says when a group breaks one of these rules:
+
+- A group needs at least one placeholder.
+- Groups can't be nested.
+- A group closes every bracket, parenthesis, quote and tag it opens, and nothing it didn't open, so leaving it out can't break the link. `({url}{? "{description}"})` opens and closes its own quotes, so it's fine. `{?[{author}}]({url})` opens the link text's `[` without closing it, and would leave `](url)` behind, so it isn't.
+
+`{url}`, `{domain}` and `{date}` always have a value, so a group with only those in it is always written. A group can't contain a literal `}`.
 
 ## Decoding URLs
 

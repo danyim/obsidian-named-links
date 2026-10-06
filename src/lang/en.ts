@@ -99,7 +99,7 @@ const en = {
     },
     customLinkFormat: {
       name: 'Custom format',
-      desc: 'Use {title}, {url}, {domain}, {author}, {site}, {description}, {section} (the heading a #link points to) and {date} or {date:YYYY-MM-DD}. A missing value is left out along with one separator next to it (- – — | · • : , / › » →) or the parentheses around it. Use only {url}, {domain} and {date} and nothing is fetched.',
+      desc: 'Use {title}, {url}, {domain}, {author}, {site}, {description}, {section} (the heading a #link points to) and {date} or {date:YYYY-MM-DD}. A missing value is left out along with one separator next to it (- – — | · • : , / › » →) or the parentheses around it. Text in {?…} is written only when every value in it is there, as in {title}{? | {author}}. Use only {url}, {domain} and {date} and nothing is fetched.',
     },
     decodeUrls: {
       name: 'Decode URLs',
@@ -113,6 +113,12 @@ const en = {
         `Put {${name}} inside a quoted attribute value, such as href="{${name}}".`,
       emptyDateFormat:
         'Give {date:} a format after the colon, such as {date:YYYY-MM-DD}, or use {date}.',
+      unclosedGroup: 'Close {? with a }, as in {title}{? | {author}}.',
+      nestedGroup: "A {?…} group can't hold another one.",
+      groupUnbalanced:
+        'Close every bracket, parenthesis, quote and tag a {?…} group opens inside the group, and only those, so it can be left out without breaking the link.',
+      groupWithoutPlaceholder:
+        'Put a placeholder in each {?…} group, as in {? | {author}}. A group is written only when its values are there.',
     },
   },
 };
