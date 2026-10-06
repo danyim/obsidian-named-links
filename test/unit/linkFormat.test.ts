@@ -355,6 +355,17 @@ describe('empty values', () => {
     );
   });
 
+  it('treat guillemets as separators', () => {
+    assert.equal(
+      render('[{title} › {section}]({url})'),
+      '[Title](https://example.com)'
+    );
+    assert.equal(
+      render('[{site} » {title}]({url})'),
+      '[Title](https://example.com)'
+    );
+  });
+
   it('take the separator after them along when none comes before', () => {
     assert.equal(
       render('[{author}: {title}]({url})'),
