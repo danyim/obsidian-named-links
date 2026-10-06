@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_TEMPLATE,
   LINK_FORMATS,
+  LinkValues,
   escapeHtml,
   localIsoDate,
   needsPageInfo,
@@ -257,6 +258,49 @@ describe('validateTemplate', () => {
       name: 'title:upper',
     });
   });
+
+  it('accepts {?…} groups', () => {
+    assert.equal(
+      validateTemplate('[{title}{? › {section}}{? | {author}}]({url})'),
+      null
+    );
+    assert.equal(
+      validateTemplate('[{title}]({url} "{title}{? by {author}}")'),
+      null
+    );
+    assert.equal(validateTemplate('[{title}]({?{url}})'), null);
+  });
+
+  it('rejects a group that is never closed', () => {
+    assert.deepEqual(validateTemplate('[{title}]({url}){? via {site}'), {
+      code: 'unclosedGroup',
+    });
+  });
+
+  it('rejects a group inside another', () => {
+    assert.deepEqual(
+      validateTemplate('[{title}{? ({author}{? - {site}})}]({url})'),
+      { code: 'nestedGroup' }
+    );
+  });
+
+  it('rejects a group that spans two parts of the link', () => {
+    assert.deepEqual(validateTemplate('{?[{title}]({url})}'), {
+      code: 'groupAcrossParts',
+    });
+    assert.deepEqual(validateTemplate('[{title}{? | {author}]({url})}'), {
+      code: 'groupAcrossParts',
+    });
+  });
+
+  it('rejects a group without a placeholder', () => {
+    assert.deepEqual(validateTemplate('[{title}{? - }]({url})'), {
+      code: 'groupWithoutPlaceholder',
+    });
+    assert.deepEqual(validateTemplate('[{title}{?}]({url})'), {
+      code: 'groupWithoutPlaceholder',
+    });
+  });
 });
 
 describe('needsPageInfo', () => {
@@ -427,6 +471,77 @@ describe('empty values', () => {
       render('<a href="{url}" data-x="- {author}">{title}</a>'),
       '<a href="https://example.com" data-x="- ">Title</a>'
     );
+  });
+});
+
+describe('{?…} groups', () => {
+  const url = 'https://example.com';
+  const render = (template: string, more: Partial<LinkValues> = {}) =>
+    renderLink(template, { title: 'Title', url, ...more });
+
+  it('are written when their values are there', () => {
+    assert.equal(
+      render('[{title}{? | {author}}]({url})', { author: 'Ann' }),
+      `[Title | Ann](${url})`
+    );
+  });
+
+  it('are dropped whole when a value is missing', () => {
+    assert.equal(render('[{title}{? | {author}}]({url})'), `[Title](${url})`);
+    assert.equal(
+      render('[{title}{? ({author}, {site})}]({url})', { author: 'Ann' }),
+      `[Title](${url})`
+    );
+  });
+
+  it('give each optional value its own separator (#20)', () => {
+    const template = '[{title}{? › {section}}{? | {author}}]({url})';
+    assert.equal(render(template, { author: 'Ann' }), `[Title | Ann](${url})`);
+    assert.equal(
+      render(template, { section: 'Usage' }),
+      `[Title › Usage](${url})`
+    );
+    assert.equal(
+      render(template, { section: 'Usage', author: 'Ann' }),
+      `[Title › Usage | Ann](${url})`
+    );
+  });
+
+  it('keep any text, not just separators', () => {
+    assert.equal(
+      render('[{title}]({url}){? (via {site})}', { site: 'YouTube' }),
+      `[Title](${url}) (via YouTube)`
+    );
+    assert.equal(render('[{title}]({url}){? (via {site})}'), `[Title](${url})`);
+  });
+
+  it('escape their values for where they sit', () => {
+    assert.equal(
+      render('[{title}{? | {author}}]({url})', { author: 'A*B' }),
+      `[Title | A\\*B](${url})`
+    );
+    assert.equal(
+      render('[{title}]({url} "{title}{? by {author}}")', { author: 'A "B"' }),
+      `[Title](${url} "Title by A \\"B\\"")`
+    );
+    assert.equal(
+      render('<a href="{url}" title="{title}{? by {author}}">{title}</a>'),
+      `<a href="${url}" title="Title">Title</a>`
+    );
+  });
+
+  it('still lose a separator to an empty value outside them', () => {
+    assert.equal(
+      render('[{site}{? - {author}}]({url})', { author: 'Ann' }),
+      `[Ann](${url})`
+    );
+  });
+
+  it('count their page fields as shown', () => {
+    assert.deepEqual(pageFieldsIn('[{title}{? | {author}}]({url})'), [
+      'author',
+    ]);
+    assert.equal(needsPageInfo('[{domain}{? | {site}}]({url})'), true);
   });
 });
 

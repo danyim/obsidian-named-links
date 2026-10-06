@@ -68,7 +68,20 @@ If Auto Link Title's settings are in your vault, the tab also offers to import t
 
 A custom format must include `{url}`. One that uses only `{url}`, `{domain}` and `{date}` writes the link straight away, with nothing fetched.
 
-A value the page doesn't have is left out, along with the separator before or after it (a hyphen, dash, `|`, `·`, `•`, `:`, `,`, `/`, `›`, `»` or `→`, with its spaces) or the parentheses around it. So `[{title} ({author})]({url})` on a page with no author is just `[Title](url)`. Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
+A value the page doesn't have is left out, along with the separator before or after it (a hyphen, dash, `|`, `·`, `•`, `:`, `,`, `/`, `›`, `»` or `→`, with its spaces) or the parentheses around it. So `[{title} ({author})]({url})` on a page with no author is just `[Title](url)`.
+
+For control over what goes, wrap text in `{?…}`. A group is written only when every value in it is there, and dropped whole otherwise:
+
+| Template | The page has | Gives |
+| --- | --- | --- |
+| `[{title}{? › {section}}{? \| {author}}]({url})` | an author, no section | `[Title \| Author](url)` |
+| | a section, no author | `[Title › Section](url)` |
+| `[{title}]({url}){? (via {site})}` | a site name | `[Title](url) (via YouTube)` |
+| | no site name | `[Title](url)` |
+
+A group can't hold another group, needs at least one placeholder, and stays within one part of the link: its text, its URL or its quoted title.
+
+Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
 
 `{section}` is empty on sites that build their pages with JavaScript, such as Obsidian Publish sites, since Named Links reads the page's HTML without running it.
 

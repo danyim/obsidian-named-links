@@ -20,6 +20,11 @@
  * - **tag**: inside an HTML tag but not in a quoted value. No escaping makes
  *   a title safe there, so {@link validateTemplate} rejects it, and rendering
  *   percent-encodes as a last resort.
+ *
+ * A `{?…}` group, as in `{title}{? | {author}}` (#20), is written only when
+ * every placeholder in it has a value. Square brackets would have been the
+ * familiar syntax, but they're already markdown link text here. A group stays
+ * within one of the parts above, so its values are escaped as usual.
  */
 import { escapeMarkdown } from './title';
 import { linkDestination } from './url';
@@ -76,21 +81,41 @@ interface Piece {
    * themselves need encoding.
    */
   angled?: boolean;
+  /** The index of the `{?…}` group the piece is in, if any. */
+  group?: number;
+}
+
+interface Group {
+  closed: boolean;
+  /** Whether another `{?` opened inside it. */
+  nested: boolean;
+  /** Whether it starts in one part of the link and ends in another. */
+  crossesParts: boolean;
+}
+
+interface Parsed {
+  pieces: Piece[];
+  groups: Group[];
 }
 
 function isPlaceholder(name: string): name is Placeholder {
   return (PLACEHOLDERS as readonly string[]).includes(name);
 }
 
-/** Splits a template into literal runs and placeholders with their context. */
-function parse(template: string): Piece[] {
+/**
+ * Splits a template into literal runs and placeholders with their context,
+ * and the `{?…}` groups they're in.
+ */
+function parse(template: string): Parsed {
   const pieces: Piece[] = [];
+  const groups: Group[] = [];
   let context: Context = 'text';
   let quote = '';
   let literal = '';
+  let group: number | undefined;
 
   const flush = () => {
-    if (literal !== '') pieces.push({ literal, context });
+    if (literal !== '') pieces.push({ literal, context, group });
     literal = '';
   };
 
@@ -107,8 +132,26 @@ function parse(template: string): Piece[] {
         context,
         quote: quote || undefined,
         angled: template[i - 1] === '<',
+        group,
       });
       i += name[0].length - 1;
+      continue;
+    }
+
+    if (ch === '{' && template[i + 1] === '?') {
+      if (group === undefined) {
+        flush();
+        groups.push({ closed: false, nested: false, crossesParts: false });
+        group = groups.length - 1;
+        i++;
+        continue;
+      }
+      // Validation rejects it; until then the inner {? is plain text.
+      groups[group].nested = true;
+    } else if (ch === '}' && group !== undefined) {
+      flush();
+      groups[group].closed = true;
+      group = undefined;
       continue;
     }
 
@@ -156,20 +199,27 @@ function parse(template: string): Piece[] {
         }
         break;
     }
-    if (context !== before && literal !== '') {
-      pieces.push({ literal, context: before });
-      literal = '';
+    if (context !== before) {
+      if (group !== undefined) groups[group].crossesParts = true;
+      if (literal !== '') {
+        pieces.push({ literal, context: before, group });
+        literal = '';
+      }
     }
   }
   flush();
-  return pieces;
+  return { pieces, groups };
 }
 
 export type TemplateError =
   | { code: 'missingUrl' }
   | { code: 'unknownPlaceholder'; name: string }
   | { code: 'unquotedInTag'; name: string }
-  | { code: 'emptyDateFormat' };
+  | { code: 'emptyDateFormat' }
+  | { code: 'unclosedGroup' }
+  | { code: 'nestedGroup' }
+  | { code: 'groupAcrossParts' }
+  | { code: 'groupWithoutPlaceholder' };
 
 /** `{name}`, or `{name:format}`, as the template wrote it. */
 function written(piece: Piece): string {
@@ -180,7 +230,7 @@ function written(piece: Piece): string {
 
 /** Why a template can't be used, or null if it can. */
 export function validateTemplate(template: string): TemplateError | null {
-  const pieces = parse(template);
+  const { pieces, groups } = parse(template);
   for (const piece of pieces) {
     if (piece.name === undefined) continue;
     // Only {date} takes a format.
@@ -197,6 +247,15 @@ export function validateTemplate(template: string): TemplateError | null {
       return { code: 'unquotedInTag', name: piece.name };
     }
   }
+  for (const [index, group] of groups.entries()) {
+    if (group.nested) return { code: 'nestedGroup' };
+    if (!group.closed) return { code: 'unclosedGroup' };
+    if (group.crossesParts) return { code: 'groupAcrossParts' };
+    // With nothing to go missing, it would always be written.
+    if (!pieces.some((piece) => piece.group === index && piece.name)) {
+      return { code: 'groupWithoutPlaceholder' };
+    }
+  }
   if (!pieces.some((piece) => piece.placeholder === 'url')) {
     return { code: 'missingUrl' };
   }
@@ -205,7 +264,7 @@ export function validateTemplate(template: string): TemplateError | null {
 
 /** Whether the template shows a title. */
 export function needsTitle(template: string): boolean {
-  return parse(template).some((piece) => piece.placeholder === 'title');
+  return parse(template).pieces.some((piece) => piece.placeholder === 'title');
 }
 
 /** Something a page says about itself, other than its title. */
@@ -224,7 +283,7 @@ const PAGE_FIELDS: readonly PageField[] = [
  */
 export function pageFieldsIn(template: string): PageField[] {
   const shown = new Set<PageField>();
-  for (const piece of parse(template)) {
+  for (const piece of parse(template).pieces) {
     const name = piece.placeholder as PageField | undefined;
     if (name && PAGE_FIELDS.includes(name)) shown.add(name);
   }
@@ -237,7 +296,7 @@ export function pageFieldsIn(template: string): PageField[] {
  * `{domain}` don't need it.
  */
 export function needsPageInfo(template: string): boolean {
-  return parse(template).some(
+  return parse(template).pieces.some(
     (piece) =>
       piece.placeholder !== undefined &&
       PAGE_PLACEHOLDERS.includes(piece.placeholder)
@@ -402,6 +461,7 @@ interface Rendered {
   context: Context;
   /** A placeholder whose value came out empty. */
   empty: boolean;
+  group?: number;
 }
 
 /**
@@ -417,7 +477,8 @@ interface Rendered {
  * 3. Otherwise, a space on both sides becomes one space.
  *
  * Only the literal text right next to the empty value changes; the rest of
- * the template is written as it stands.
+ * the template is written as it stands. That can be the edge of a `{?…}`
+ * group, so `{site}{? - {author}}` with no site is just the author.
  */
 function collapseEmpty(parts: Rendered[]): void {
   parts.forEach((part, i) => {
@@ -478,7 +539,7 @@ export function renderLink(template: string, values: LinkValues): string {
     }
   };
 
-  const parts: Rendered[] = parse(template).map((piece) => {
+  const rendered = (piece: Piece): Omit<Rendered, 'group'> => {
     if (piece.literal !== undefined) {
       return { text: piece.literal, context: piece.context, empty: false };
     }
@@ -497,7 +558,20 @@ export function renderLink(template: string, values: LinkValues): string {
       context: piece.context,
       empty: value === '' && name !== 'url',
     };
-  });
+  };
+  const all: Rendered[] = parse(template).pieces.map((piece) => ({
+    ...rendered(piece),
+    group: piece.group,
+  }));
+
+  // A group with an empty value goes whole, so the values left in the
+  // groups that stay are never empty.
+  const dropped = new Set(
+    all.filter((part) => part.empty).map((part) => part.group)
+  );
+  const parts = all.filter(
+    (part) => part.group === undefined || !dropped.has(part.group)
+  );
   collapseEmpty(parts);
   return parts.map((part) => part.text).join('');
 }

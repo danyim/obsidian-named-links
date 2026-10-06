@@ -103,7 +103,7 @@ const ja: Strings = {
     },
     customLinkFormat: {
       name: 'カスタム形式',
-      desc: '{title}、{url}、{domain}、{author}、{site}、{description}、{section}（#付きリンクが指す見出し）、{date} または {date:YYYY-MM-DD} が使えます。値がない場合は、隣の区切り文字1つ（- – — | · • : , / › » →）または囲んでいる括弧ごと省かれます。{url}、{domain}、{date} だけを使う場合はページを取得しません。',
+      desc: '{title}、{url}、{domain}、{author}、{site}、{description}、{section}（#付きリンクが指す見出し）、{date} または {date:YYYY-MM-DD} が使えます。値がない場合は、隣の区切り文字1つ（- – — | · • : , / › » →）または囲んでいる括弧ごと省かれます。{?…} で囲んだ部分は、中の値がすべてある場合だけ書き込まれます（例：{title}{? | {author}}）。{url}、{domain}、{date} だけを使う場合はページを取得しません。',
     },
     decodeUrls: {
       name: 'URLをデコード',
@@ -117,6 +117,13 @@ const ja: Strings = {
         `{${name}} は href="{${name}}" のように引用符で囲んだ属性値の中に置いてください。`,
       emptyDateFormat:
         '{date:} のコロンの後に {date:YYYY-MM-DD} のような書式を書くか、{date} を使ってください。',
+      unclosedGroup:
+        '{? は {title}{? | {author}} のように } で閉じてください。',
+      nestedGroup: '{?…} の中に別の {?…} は入れられません。',
+      groupAcrossParts:
+        '{?…} はリンクの1つの部分（テキスト、URL、タイトル）の中に収めてください。',
+      groupWithoutPlaceholder:
+        '{?…} には {? | {author}} のようにプレースホルダーを入れてください。中の値がすべてある場合だけ書き込まれます。',
     },
   },
 };
