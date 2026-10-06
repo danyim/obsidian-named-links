@@ -115,8 +115,8 @@ const en = {
         'Give {date:} a format after the colon, such as {date:YYYY-MM-DD}, or use {date}.',
       unclosedGroup: 'Close {? with a }, as in {title}{? | {author}}.',
       nestedGroup: "A {?…} group can't hold another one.",
-      groupEndsElsewhere:
-        'End each {?…} group in the part of the link it starts in, such as its text, its URL or a quoted title, so it can be left out without breaking the link.',
+      groupUnbalanced:
+        'Close every bracket, parenthesis, quote and tag a {?…} group opens inside the group, and only those, so it can be left out without breaking the link.',
       groupWithoutPlaceholder:
         'Put a placeholder in each {?…} group, as in {? | {author}}. A group is written only when its values are there.',
     },

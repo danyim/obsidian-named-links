@@ -298,16 +298,37 @@ describe('validateTemplate', () => {
 
   it('rejects a group that ends in another part of the link', () => {
     assert.deepEqual(validateTemplate('{?[{title}]({url}}'), {
-      code: 'groupEndsElsewhere',
+      code: 'groupUnbalanced',
     });
     assert.deepEqual(validateTemplate('[{title}{? | {author}]({url}})'), {
-      code: 'groupEndsElsewhere',
+      code: 'groupUnbalanced',
     });
     // Back in a link title, but one in other quotes.
     assert.deepEqual(
       validateTemplate(`[{title}]({url} "{title}{?" '{author}}')`),
-      { code: 'groupEndsElsewhere' }
+      { code: 'groupUnbalanced' }
     );
+  });
+
+  it('rejects a group that opens a bracket it does not close', () => {
+    // Dropped, it would leave "](url)".
+    assert.deepEqual(validateTemplate('{?[{author}}]({url})'), {
+      code: 'groupUnbalanced',
+    });
+    assert.deepEqual(validateTemplate('[{title}]({url}{?({author}})'), {
+      code: 'groupUnbalanced',
+    });
+  });
+
+  it('rejects a group that closes a bracket it did not open', () => {
+    assert.deepEqual(validateTemplate('[{title}{? | {author}]}({url})'), {
+      code: 'groupUnbalanced',
+    });
+  });
+
+  it('accepts a whole link, or an escaped bracket, in a group', () => {
+    assert.equal(validateTemplate('{title}{? [{author}]({url})}'), null);
+    assert.equal(validateTemplate('[{title}]({url}){? \\[{author}}'), null);
   });
 
   it('rejects a group without a placeholder', () => {

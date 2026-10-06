@@ -107,8 +107,8 @@ export class NamedLinksSettingTab extends PluginSettingTab {
         return messages.unclosedGroup;
       case 'nestedGroup':
         return messages.nestedGroup;
-      case 'groupEndsElsewhere':
-        return messages.groupEndsElsewhere;
+      case 'groupUnbalanced':
+        return messages.groupUnbalanced;
       case 'groupWithoutPlaceholder':
         return messages.groupWithoutPlaceholder;
     }

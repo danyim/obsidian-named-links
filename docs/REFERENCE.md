@@ -127,7 +127,7 @@ The settings tab says when a group breaks one of these rules:
 
 - A group needs at least one placeholder.
 - Groups can't be nested.
-- A group ends in the part of the link it starts in. `({url}{? "{description}"})` starts and ends inside the URL's parentheses, so it's fine. `{?[{title}]({url}}` starts in the link text and ends in the URL, so it isn't.
+- A group closes every bracket, parenthesis, quote and tag it opens, and nothing it didn't open, so leaving it out can't break the link. `({url}{? "{description}"})` opens and closes its own quotes, so it's fine. `{?[{author}}]({url})` opens the link text's `[` without closing it, and would leave `](url)` behind, so it isn't.
 
 `{url}`, `{domain}` and `{date}` always have a value, so a group with only those in it is always written. A group can't contain a literal `}`.
 

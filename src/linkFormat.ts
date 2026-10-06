@@ -23,9 +23,10 @@
  *
  * A `{?…}` group, as in `{title}{? | {author}}` (#20), is written only when
  * every placeholder in it has a value. Square brackets would have been the
- * familiar syntax, but they're already markdown link text here. A group ends
- * in the same part it starts in, so writing or dropping it can't leave a
- * bracket, quote or tag open, and its values are escaped as usual.
+ * familiar syntax, but they're already markdown link text here. A group
+ * closes every bracket, parenthesis, quote and tag it opens, and nothing it
+ * didn't open, so dropping it can't break the rest of the link. Its values
+ * are escaped as usual.
  */
 import { escapeMarkdown } from './title';
 import { linkDestination } from './url';
@@ -92,11 +93,13 @@ interface Group {
   nested: boolean;
   /** The part of the link it starts in, and the quote, if it's quoted. */
   start: { context: Context; quote: string };
+  /** The markdown brackets and parentheses it has opened and not closed. */
+  open: string[];
   /**
-   * Whether it ends in another part, or in another quote, so writing or
-   * dropping it would change what the rest of the template is part of.
+   * Whether it leaves a bracket, parenthesis, quote or tag open, or closes
+   * one it didn't open, so dropping it would break the rest of the link.
    */
-  endsElsewhere: boolean;
+  unbalanced: boolean;
 }
 
 interface Parsed {
@@ -123,6 +126,14 @@ function parse(template: string): Parsed {
   const flush = () => {
     if (literal !== '') pieces.push({ literal, context, group });
     literal = '';
+  };
+  const opens = (delimiter: string) => {
+    if (group !== undefined) groups[group].open.push(delimiter);
+  };
+  const closes = (delimiter: string) => {
+    if (group !== undefined && groups[group].open.pop() !== delimiter) {
+      groups[group].unbalanced = true;
+    }
   };
 
   for (let i = 0; i < template.length; i++) {
@@ -151,7 +162,8 @@ function parse(template: string): Parsed {
           closed: false,
           nested: false,
           start: { context, quote },
-          endsElsewhere: false,
+          open: [],
+          unbalanced: false,
         });
         group = groups.length - 1;
         i++;
@@ -161,10 +173,17 @@ function parse(template: string): Parsed {
       groups[group].nested = true;
     } else if (ch === '}' && group !== undefined) {
       flush();
-      const { start } = groups[group];
+      const { start, open } = groups[group];
       groups[group].closed = true;
-      groups[group].endsElsewhere =
-        start.context !== context || start.quote !== quote;
+      // Ending in another part or quote leaves a quote, tag or destination
+      // open, or closes one the group didn't open.
+      if (
+        start.context !== context ||
+        start.quote !== quote ||
+        open.length > 0
+      ) {
+        groups[group].unbalanced = true;
+      }
       group = undefined;
       continue;
     }
@@ -174,14 +193,21 @@ function parse(template: string): Parsed {
     // can tell link text from the destination after it. The characters that
     // switch contexts stay with the context they close.
     const before: Context = context;
+    const escaped = template[i - 1] === '\\';
     switch (context) {
       case 'text':
         if (ch === ']' && template[i + 1] === '(') {
           literal += '(';
           i++;
           context = 'destination';
+          closes('[');
+          opens('(');
         } else if (ch === '<' && /[a-zA-Z]/.test(template[i + 1] ?? '')) {
           context = 'tag';
+        } else if (ch === '[' && !escaped) {
+          opens('[');
+        } else if (ch === ']' && !escaped) {
+          closes('[');
         }
         break;
       case 'destination':
@@ -190,6 +216,9 @@ function parse(template: string): Parsed {
           context = 'linkTitle';
         } else if (ch === ')') {
           context = 'text';
+          closes('(');
+        } else if (ch === '(') {
+          opens('(');
         }
         break;
       case 'linkTitle':
@@ -229,7 +258,7 @@ export type TemplateError =
   | { code: 'emptyDateFormat' }
   | { code: 'unclosedGroup' }
   | { code: 'nestedGroup' }
-  | { code: 'groupEndsElsewhere' }
+  | { code: 'groupUnbalanced' }
   | { code: 'groupWithoutPlaceholder' };
 
 /** `{name}`, or `{name:format}`, as the template wrote it. */
@@ -261,7 +290,7 @@ export function validateTemplate(template: string): TemplateError | null {
   for (const [index, group] of groups.entries()) {
     if (group.nested) return { code: 'nestedGroup' };
     if (!group.closed) return { code: 'unclosedGroup' };
-    if (group.endsElsewhere) return { code: 'groupEndsElsewhere' };
+    if (group.unbalanced) return { code: 'groupUnbalanced' };
     // With nothing to go missing, it would always be written.
     if (!pieces.some((piece) => piece.group === index && piece.name)) {
       return { code: 'groupWithoutPlaceholder' };
