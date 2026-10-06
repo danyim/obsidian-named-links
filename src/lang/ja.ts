@@ -103,7 +103,7 @@ const ja: Strings = {
     },
     customLinkFormat: {
       name: 'カスタム形式',
-      desc: '{title}、{url}、{domain}、{author}、{site}、{description}、{section}（#付きリンクが指す見出し）、{date} または {date:YYYY-MM-DD} が使えます。値がない場合は、隣の区切り文字ごと省かれます。{url}、{domain}、{date} だけを使う場合はページを取得しません。',
+      desc: '{title}、{url}、{domain}、{author}、{site}、{description}、{section}（#付きリンクが指す見出し）、{date} または {date:YYYY-MM-DD} が使えます。値がない場合は、隣の区切り文字1つ（- – — | · • : , / › » →）または囲んでいる括弧ごと省かれます。{url}、{domain}、{date} だけを使う場合はページを取得しません。',
     },
     decodeUrls: {
       name: 'URLをデコード',

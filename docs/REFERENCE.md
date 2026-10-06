@@ -68,7 +68,7 @@ If Auto Link Title's settings are in your vault, the tab also offers to import t
 
 A custom format must include `{url}`. One that uses only `{url}`, `{domain}` and `{date}` writes the link straight away, with nothing fetched.
 
-A value the page doesn't have is left out, along with the separator before or after it (a hyphen, dash, `|`, `·`, `•`, `:`, `,`, `/`, `›` or `»`, with its spaces) or the parentheses around it. So `[{title} ({author})]({url})` on a page with no author is just `[Title](url)`. Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
+A value the page doesn't have is left out, along with the separator before or after it (a hyphen, dash, `|`, `·`, `•`, `:`, `,`, `/`, `›`, `»` or `→`, with its spaces) or the parentheses around it. So `[{title} ({author})]({url})` on a page with no author is just `[Title](url)`. Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
 
 `{section}` is empty on sites that build their pages with JavaScript, such as Obsidian Publish sites, since Named Links reads the page's HTML without running it.
 

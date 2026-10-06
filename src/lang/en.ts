@@ -99,7 +99,7 @@ const en = {
     },
     customLinkFormat: {
       name: 'Custom format',
-      desc: 'Use {title}, {url}, {domain}, {author}, {site}, {description}, {section} (the heading a #link points to) and {date} or {date:YYYY-MM-DD}. A missing value is left out along with the separator next to it. Use only {url}, {domain} and {date} and nothing is fetched.',
+      desc: 'Use {title}, {url}, {domain}, {author}, {site}, {description}, {section} (the heading a #link points to) and {date} or {date:YYYY-MM-DD}. A missing value is left out along with one separator next to it (- – — | · • : , / › » →) or the parentheses around it. Use only {url}, {domain} and {date} and nothing is fetched.',
     },
     decodeUrls: {
       name: 'Decode URLs',
