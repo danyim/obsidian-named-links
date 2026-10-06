@@ -112,6 +112,9 @@ specs" section of [`docs/TESTING.md`](docs/TESTING.md) before writing one.
   (`minAppVersion` is 1.13.0+, so there is no `display()` fallback).
 - UI strings live in `src/lang/`. Add every new one to both `en.ts` and
   `ja.ts`.
+- Document every command and setting in `docs/REFERENCE.md`, in the order
+  the settings tab shows them. The README keeps only an overview and
+  examples.
 
 ## Undo history
 

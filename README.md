@@ -9,131 +9,67 @@ Paste a URL into Obsidian and get a markdown link titled with the page's name: `
 
 ## What it does
 
-- **Paste a URL** and a `[Fetching title…](url)` placeholder goes in straight away, then becomes the titled link. Several URLs pasted at once are each titled.
+- **Paste a URL** and a `[Fetching title…](url)` placeholder goes in at once, then becomes the titled link. Paste several URLs and each is titled.
 - **Drop a URL** from another app and the same happens where you drop it.
-- **A link copied or dragged with its own text** (Edge's Copy link, a link dragged out of a page, Firefox) uses that text as the title straight away, without fetching, so it works for pages behind a login. Text that says nothing, like the bare URL or "click here", is fetched over.
-- **Paste text over a selected URL** (or a whole link) to make the text its title, with nothing fetched. This one is off until you turn it on in settings.
-- **Title URLs already in a note** with the [Add a title to an existing URL](#commands) command.
-- **In vim mode**, putting a URL with `p` or `P` titles it the same way, counts, registers and visual mode included.
+- **Copy a link with its text** (Edge's Copy link, Firefox, or a link dragged out of a page) and that text is the title, with nothing fetched, so it works for pages behind a login.
+- **Paste a URL over selected text** to link that text instead of fetching a title.
+- **Paste text over a selected URL** to make the text its title (off until you turn it on).
+- **Title URLs already in a note** with the **Add a title to an existing URL** command, at the cursor or across a selection.
+- **In vim mode**, putting a URL with `p` or `P` titles it too.
 - **Undo** gives back the URL as you pasted it; undo again to remove the paste.
 
-The URL is left as pasted when you paste as plain text (Ctrl/Cmd+Shift+V, a system shortcut, not one the plugin adds), paste with several cursors, paste into code, frontmatter or a link target (`[text](`, `[1]: `, `href="`), or paste an image or an excluded site's URL. If no title can be found, the URL stays and a notice says so.
+A paste is only titled when it's nothing but URLs. It's left as pasted when you paste as plain text (Ctrl/Cmd+Shift+V), paste with several cursors, paste into code, frontmatter or a link target (`[text](`, `[1]: `, `href="`), or paste an image or an excluded site's URL. If no title can be found, the URL stays and a notice says so.
 
-Titles have their line breaks collapsed and markdown characters escaped. A file such as a PDF is named after its path rather than downloaded.
+Files such as PDFs are named after their path instead of downloaded, except arXiv papers, which get the paper's title from its abstract page.
 
-## Commands
+## Examples
 
-None has a default hotkey; set one under Settings → Hotkeys.
+### Link formats
 
-| Command | What it does |
-| --- | --- |
-| Add a title to an existing URL | Titles the URL under the cursor, replacing a `[text](url)` link's text or turning a `<URL>` autolink into a link. With a selection, titles every bare URL in it, skipping code, frontmatter and URLs already in links. |
-| Paste URL and fetch its title | Pastes and titles the clipboard's URLs, even with **Title pasted URLs** off. |
-| Paste without fetching a title | Pastes the clipboard as it is. |
+Set **Link format** to Custom and write a template. These are real results:
 
-## Settings
-
-![The Named Links settings tab in dark mode](screenshots/settings.png)
-
-| Setting | Default | |
+| Template | Pasting | Gives |
 | --- | --- | --- |
-| Link format | Markdown link | See [Link format](#link-format). |
-| Decode URLs | Off | Write `%E5%AF%BF` as `寿`. See [Decoding URLs](#decoding-urls). |
-| Title pasted URLs | On | Fetch titles for pasted URLs. |
-| Title dropped URLs | On | Fetch titles for dropped URLs. |
-| Use the selection as the title | On | Pasting a URL over selected text links that text instead of fetching. |
-| Paste text onto a selected URL as its title | Off | Pasting text over a selected URL or link makes the text its title. Works with **Title pasted URLs** off too. |
-| Remove the site name | Off | `Video - YouTube` becomes `Video`. See [Cleaning up titles](#cleaning-up-titles). |
-| Domain title rules | Empty | Find and replace for one site's titles, run first. |
-| Page title rules | Empty | Find and replace for every title, run second. |
-| Maximum title length | 0 (no limit) | Shorten longer titles with `…`. |
-| Fetch X posts through FxTwitter | Off | See [Privacy](#privacy). |
-| Excluded sites | Empty | Never fetched. `example.com` covers its subdomains; other text matches any URL containing it. |
-| Paste excluded sites as | The URL as it is | Or a link titled with the domain. |
+| `[{title}]({url}) (accessed {date})` | `https://obsidian.md/` | `[Obsidian - Sharpen your thinking](https://obsidian.md/) (accessed 2026-10-04)` |
+| `[{title} ({author})]({url})` | a YouTube video | `[The essence of calculus (3Blue1Brown)](https://www.youtube.com/watch?v=WUvTyaaNkzM)` |
+| `[{title}: {section}]({url})` | `https://en.wikipedia.org/wiki/Markdown#History` | `[Markdown: History](https://en.wikipedia.org/wiki/Markdown#History)` |
+| `[{title}]({url}) - {description}` | `https://obsidian.md/` | `[Obsidian - Sharpen your thinking](https://obsidian.md/) - The free and flexible app for your private thoughts.` |
 
-### Link format
+A value the page doesn't have is dropped along with the separator or parentheses next to it, so the same Wikipedia template on a URL without `#History` gives `[Markdown](…)`. The Wikipedia example also has **Remove the site name** on.
 
-| Link format | Result |
-| --- | --- |
-| Markdown link | `[Example Domain](https://example.com)` |
-| Markdown link with a hover title | `[Example Domain](https://example.com "Example Domain")` |
-| HTML link | `<a href="https://example.com">Example Domain</a>` |
-| Custom | Your own template, using the placeholders below |
+### Title clean-up
 
-| Placeholder | Is |
-| --- | --- |
-| `{title}` | The page's title |
-| `{url}`, `{domain}` | The link's URL, and its host without `www.` |
-| `{author}` | A video's channel, or the page's author |
-| `{site}` | The site's name, such as `YouTube` |
-| `{description}` | The page's description |
-| `{section}` | The heading a `#fragment` in the URL points to |
-| `{date}`, `{date:FORMAT}` | Today, as `YYYY-MM-DD` or a [moment.js format](https://momentjs.com/docs/#/displaying/format/) |
+**Remove the site name** and find-and-replace rules trim titles before they're written:
 
-For example:
+| Setting | Title | Becomes |
+| --- | --- | --- |
+| Remove the site name | `GitHub - obsidianmd/obsidian-releases: Community plugins list, … · GitHub` | `obsidianmd/obsidian-releases: Community plugins list, …` |
+| Domain title rule `github.com: /^GitHub - ([^:]+):.*$/ => $1` | the same | `obsidianmd/obsidian-releases` |
+| Page title rule `(Official Video) =>` | `Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)` | `Rick Astley - Never Gonna Give You Up (4K Remaster)` |
 
-| Template | Result |
-| --- | --- |
-| `[{title} - {author}]({url})` | `[A video - A Channel](https://youtu.be/…)` |
-| `[{title} › {section}]({url})` | `[Internal links › Link to a heading](https://help.obsidian.md/…#…)` |
-| `[source]({url}) ({date})` | `[source](https://example.com) (2026-10-03)`, with nothing fetched |
+### Scripts
 
-A value the page doesn't have is left out, along with the separator next to it (` - `, ` | `, `: ` and the like) or the parentheses around it, so `[{title} - {author}]({url})` on a page with no author is just `[Title](url)`. Each value is escaped for where it sits in the template, so nothing in a page's metadata can break the link.
-
-### Decoding URLs
-
-With **Decode URLs** on, a finished link's URL is written with its percent-escapes decoded, so it's readable and searchable:
-
-| Pasted | Written as |
-| --- | --- |
-| `https://jisho.org/word/%E5%AF%BF%E5%8F%B8` | `[Title](https://jisho.org/word/寿司)` |
-| `https://en.wikipedia.org/wiki/Blue%20jay` | `[Title](<https://en.wikipedia.org/wiki/Blue jay>)` |
-
-Anything that would change where the URL leads or break the markdown stays encoded (`%`, `/ ? # & =` and the other URL delimiters, quotes, brackets and invisible characters). The title is still fetched from the URL as pasted.
-
-### Cleaning up titles
-
-In order: tidy whitespace, remove the site name, run domain title rules, run page title rules, then shorten.
-
-**Remove the site name** drops the first or last part of a title (split on ` | `, ` - `, ` · ` and similar) when it names the site, going by the page's `og:site_name` or its address. It handles abbreviations and a leading "The", and never empties a title.
-
-| Before | After |
-| --- | --- |
-| `owner/repo: A description · GitHub` | `owner/repo: A description` |
-| `An article \| The New York Times` | `An article` |
-| `C - The Language` on another site | unchanged |
-
-**Rules** are one `pattern => replacement` per line. Page title rules apply to every title:
-
-```
-(Official Video) =>
-/^\[(\w+)\] (.*)$/ => $2 ($1)
-```
-
-Domain title rules start with the site they apply to, subdomains included:
-
-```
-github.com: /^GitHub - / =>
-*.substack.com: / \| .*$/ =>
-```
-
-A pattern is literal text unless written `/pattern/flags`, which makes it a regular expression (add `g` to replace every match, and use `$1` for groups). An empty replacement deletes the match. Invalid lines are skipped and flagged in the settings tab, and rules never leave a title empty.
-
-## Scripting
-
-Other plugins and scripts can fetch titles through `app.plugins.plugins['named-links'].api`, using your settings (clean-up, link format, excluded sites). In a Templater template, this turns the selected URL into a titled link:
+In a [Templater](https://github.com/SilentVoid13/Templater) template, this turns the selected URL into a titled link, using your settings:
 
 ```
 <% await app.plugins.plugins['named-links'].api.getLink(tp.file.selection()) %>
 ```
 
-| Method | Returns |
-| --- | --- |
-| `getTitle(url)` | The cleaned-up title, not escaped, or `null` if there's none or the site is excluded. |
-| `getLink(url)` | The link a paste would write, or the URL as given if no title is found. |
-| `formatLink(url, title)` | Your link format applied to a title you already have. Nothing is fetched. |
+## Commands and settings
 
-None of them throw; bad input gets `null` or the input back. `api.version` is `1` and only goes up for a breaking change (a method removed, renamed or changed in what it takes or returns); new methods don't change it. The types are in [src/api.ts](src/api.ts).
+![The Named Links settings tab in dark mode](screenshots/settings.png)
+
+Every command, setting, placeholder and rule, and the scripting API, is described in [Commands and settings](https://github.com/danyim/obsidian-named-links/blob/main/docs/REFERENCE.md). No command has a default hotkey; set one under Settings → Hotkeys.
+
+## Privacy
+
+Named Links requests the pasted URL from your device, without loading its scripts, images or media, and checks the headers first so large files aren't downloaded. YouTube, Vimeo, Spotify and SoundCloud links go to that site's oEmbed API instead. Excluded sites are never requested, and neither is a link that came with its own title.
+
+The one opt-in exception: **Fetch X posts through FxTwitter** sends twitter.com and x.com URLs to fxtwitter.com or fixupx.com, a third-party service. There's no telemetry.
+
+## Mobile
+
+Works on Obsidian mobile with the long-press **Paste** action. Some keyboards' clipboard shortcuts (Gboard's, for one) don't fire a paste event; use the **Paste URL and fetch its title** command instead.
 
 ## Moving over from Auto Link Title
 
@@ -144,20 +80,11 @@ What's different from Auto Link Title 1.5.5:
 - Titles are read from the page's HTML. Auto Link Title loaded pages in a hidden browser window with Node.js access, running every site's scripts on your machine ([#177](https://github.com/zolrath/obsidian-auto-link-title/issues/177), [#164](https://github.com/zolrath/obsidian-auto-link-title/issues/164)).
 - No LinkPreview.net, and no default hotkeys ([#170](https://github.com/zolrath/obsidian-auto-link-title/issues/170), [#101](https://github.com/zolrath/obsidian-auto-link-title/issues/101)).
 - Legacy encodings such as GBK decode correctly ([#133](https://github.com/zolrath/obsidian-auto-link-title/issues/133)), and YouTube, Vimeo, Spotify and SoundCloud titles come from oEmbed.
-- arXiv PDF links get the paper's title, read from its abstract page, instead of a file name like `2206.08077.pdf` ([#111](https://github.com/zolrath/obsidian-auto-link-title/issues/111)).
+- arXiv PDF links get the paper's title instead of a file name like `2206.08077.pdf` ([#111](https://github.com/zolrath/obsidian-auto-link-title/issues/111)).
 - `.ai` domains, hyphenated hosts, ports and IPs are recognized ([#172](https://github.com/zolrath/obsidian-auto-link-title/issues/172), [#154](https://github.com/zolrath/obsidian-auto-link-title/issues/154)), and `www.` URLs get `https://` ([#12](https://github.com/zolrath/obsidian-auto-link-title/issues/12)).
 - Stuck requests time out instead of leaving `Fetching Title#…` behind ([#167](https://github.com/zolrath/obsidian-auto-link-title/issues/167)).
 - URLs in code and frontmatter are left alone ([#36](https://github.com/zolrath/obsidian-auto-link-title/issues/36), [#21](https://github.com/zolrath/obsidian-auto-link-title/issues/21)), and excluded sites match by domain and can paste as plain URLs ([#159](https://github.com/zolrath/obsidian-auto-link-title/issues/159)).
-
-## Privacy
-
-Named Links requests the pasted URL from your device, without loading its scripts, images or media, and checks the headers first so large files aren't downloaded. YouTube, Vimeo, Spotify and SoundCloud links go to that site's oEmbed API instead. Excluded sites are never requested, and neither is a link that came with its own title.
-
-The one opt-in exception: **Fetch X posts through FxTwitter** sends twitter.com and x.com URLs to fxtwitter.com or fixupx.com, a third-party service. There's no telemetry.
-
-## Mobile
-
-Works on Obsidian mobile with the long-press **Paste** action. Some keyboard clipboard shortcuts (Gboard's, for one) don't fire a paste event; use the **Paste URL and fetch its title** command instead.
+- Vim's `p` and `P` title URLs ([#7](https://github.com/zolrath/obsidian-auto-link-title/issues/7)), copied links keep their own title ([#129](https://github.com/zolrath/obsidian-auto-link-title/issues/129)), link formats can show the author, description and date ([#15](https://github.com/zolrath/obsidian-auto-link-title/issues/15), [#86](https://github.com/zolrath/obsidian-auto-link-title/issues/86), [#136](https://github.com/zolrath/obsidian-auto-link-title/issues/136)), and scripts can fetch titles ([#52](https://github.com/zolrath/obsidian-auto-link-title/issues/52), [#146](https://github.com/zolrath/obsidian-auto-link-title/issues/146)).
 
 ## How it compares
 
