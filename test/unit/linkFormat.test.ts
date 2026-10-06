@@ -366,6 +366,23 @@ describe('empty values', () => {
     );
   });
 
+  it('treat an arrow as a separator', () => {
+    assert.equal(
+      render('[{title} → {section}]({url})'),
+      '[Title](https://example.com)'
+    );
+  });
+
+  it('keep the separator after them when the one before goes', () => {
+    assert.equal(
+      renderLink('[{title} › {section} | {author}]({url})', {
+        ...values,
+        author: 'Channel',
+      }),
+      '[Title | Channel](https://example.com)'
+    );
+  });
+
   it('take the separator after them along when none comes before', () => {
     assert.equal(
       render('[{author}: {title}]({url})'),

@@ -390,9 +390,10 @@ function escapeFor(
 }
 
 // A separator between two values: a hyphen, dash, bar, middle dot, bullet,
-// colon, comma, slash or guillemet (as in "Page › Section"), with any spaces
-// around it.
-const SEPARATOR = String.raw`\s*(?:[-|·•:,/›»]|–|—)\s*`;
+// colon, comma, slash, guillemet or arrow (as in "Page › Section"), with any
+// spaces around it. A plain > isn't one: in `<{url}> {author}` it closes the
+// autolink.
+const SEPARATOR = String.raw`\s*(?:[-|·•:,/›»→]|–|—)\s*`;
 const SEPARATOR_AT_END = new RegExp(`${SEPARATOR}$`, 'u');
 const SEPARATOR_AT_START = new RegExp(`^${SEPARATOR}`, 'u');
 
