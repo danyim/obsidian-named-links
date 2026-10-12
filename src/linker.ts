@@ -71,6 +71,14 @@ export interface InsertPlan {
   pending: PendingTitle[];
 }
 
+/**
+ * Obsidian's bundled moment, as much of it as `{date}` uses. Obsidian types
+ * `moment` with the moment package's own typings, which don't always
+ * resolve where the code is checked (Obsidian's plugin review can't find
+ * them), and without them every use of it lints as unsafe.
+ */
+const now = moment as unknown as () => { format(format: string): string };
+
 let placeholderCount = 0;
 
 /**
@@ -142,7 +150,7 @@ export class Linker {
       site: page?.siteName,
       description: page?.description,
       section: page?.section,
-      formatDate: (format) => moment().format(format),
+      formatDate: (format) => now().format(format),
     });
   }
 

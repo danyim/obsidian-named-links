@@ -77,6 +77,16 @@ describe('Link format placeholders from the page', function () {
     expect(await pasteInto(url)).toBe(`[About page](${url})`);
   });
 
+  it('writes a {?…} group only when its values are there (#20)', async function () {
+    await custom('[{title}{? › {section}}{? | {author}}]({url})');
+    const noSection = `${base}/about`;
+    expect(await pasteInto(noSection)).toBe(
+      `[About page | Ada Lovelace](${noSection})`
+    );
+    const noAuthor = `${base}/about?bare=1#usage`;
+    expect(await pasteInto(noAuthor)).toBe(`[About page › Usage](${noAuthor})`);
+  });
+
   it('reads the author from oEmbed (upstream #15, #34)', async function () {
     await browser.executeObsidian(({ app }, base) => {
       (app as any).plugins.plugins['named-links'].oEmbedProviders = [
