@@ -174,6 +174,8 @@ const EXCHANGE_HOST =
 
 // /questions/<id>/<slug>, the /q/<id> share link, and /a/<id> for an answer.
 const EXCHANGE_QUESTION_PATH = /^\/(?:questions|q)\/(\d+)(?:\/|$)/i;
+// The permalink an answer's share button gives: /questions/<id>/<slug>/<answer>.
+const EXCHANGE_ANSWER_PERMALINK = /^\/questions\/\d+\/[^/]+\/(\d+)\/?$/i;
 const EXCHANGE_ANSWER_PATH = /^\/a\/(\d+)(?:\/|$)/i;
 
 const EXCHANGE_API = 'https://api.stackexchange.com/2.3';
@@ -196,7 +198,9 @@ export function exchangePost(url: string): ExchangePost | null {
   const host = parsed.hostname.toLowerCase();
   if (!EXCHANGE_HOST.test(host)) return null;
   const site = host.replace(/^www\./, '');
-  const answer = parsed.pathname.match(EXCHANGE_ANSWER_PATH);
+  const answer =
+    parsed.pathname.match(EXCHANGE_ANSWER_PATH) ??
+    parsed.pathname.match(EXCHANGE_ANSWER_PERMALINK);
   if (answer) return { site, kind: 'answer', id: answer[1] };
   const question = parsed.pathname.match(EXCHANGE_QUESTION_PATH);
   return question ? { site, kind: 'question', id: question[1] } : null;
@@ -622,7 +626,9 @@ async function exchangeInfo(
   return {
     title,
     siteName: null,
-    author: author ?? ownerName(question),
+    // An answer whose author is gone stays unattributed, not credited to the
+    // asker.
+    author: post.kind === 'answer' ? author : ownerName(question),
     description: null,
     section: null,
   };
@@ -687,27 +693,32 @@ export async function fetchPageInfo(
       (field) => embedded[FIELD_KEYS[field]] === null
     );
     if (!missing) return embedded;
-    const page = await pageInfoFromHtml(absolute, options, headers);
-    return page ? mergePageInfo(embedded, page) : embedded;
+    try {
+      const page = await pageInfoFromHtml(absolute, options, headers);
+      return page ? mergePageInfo(embedded, page) : embedded;
+    } catch (e) {
+      // oEmbed already named the page; a gate in front of the rest of it
+      // doesn't undo that.
+      if (e instanceof BlockedError) return embedded;
+      throw e;
+    }
   }
 
   const exchange = exchangePost(absolute);
   if (exchange) {
     // The page comes first: it knows the site's name, and a request that
     // gets through costs the API's small anonymous quota nothing. The API
-    // only steps in for a page that can't be read.
-    let blocked: BlockedError | null = null;
+    // only steps in when bot protection turned the request away, which is
+    // the only case the privacy notes disclose; a 404 or a network failure
+    // doesn't reach it.
     try {
-      const html = await pageInfoFromHtml(absolute, options, headers);
-      if (html) return html;
+      return await pageInfoFromHtml(absolute, options, headers);
     } catch (e) {
       if (!(e instanceof BlockedError)) throw e;
-      blocked = e;
+      const api = await exchangeInfo(exchange, options, headers);
+      if (api) return api;
+      throw e;
     }
-    const api = await exchangeInfo(exchange, options, headers);
-    if (api) return api;
-    if (blocked) throw blocked;
-    return null;
   }
 
   return pageInfoFromHtml(absolute, options, headers);

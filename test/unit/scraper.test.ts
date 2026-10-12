@@ -713,6 +713,34 @@ describe('bot protection', () => {
   });
 });
 
+describe('bot protection after oEmbed', () => {
+  it('keeps the oEmbed result when the supplemental page is blocked', async () => {
+    const { http } = fakeHttp((req): ReturnType<Route> =>
+      req.url.startsWith('https://www.youtube.com/oembed')
+        ? {
+            headers: { 'content-type': 'application/json' },
+            bytes: new TextEncoder().encode(
+              JSON.stringify({ title: 'A video', author_name: 'A channel' })
+            ),
+          }
+        : {
+            status: 403,
+            headers: {
+              'content-type': 'text/html',
+              'cf-mitigated': 'challenge',
+            },
+            html: page('Just a moment...'),
+          }
+    );
+    const info = await fetchPageInfo('https://www.youtube.com/watch?v=abc', {
+      http,
+      fields: ['description'],
+    });
+    assert.equal(info?.title, 'A video');
+    assert.equal(info?.description, null);
+  });
+});
+
 describe('Stack Exchange', () => {
   const texQuestion =
     'https://tex.stackexchange.com/questions/261537/a-guide-on-how-to-produce-accessible-pdf-files';
@@ -725,7 +753,7 @@ describe('Stack Exchange', () => {
       ],
       [
         'https://tex.stackexchange.com/questions/261537/slug/605142#605142',
-        { site: 'tex.stackexchange.com', kind: 'question', id: '261537' },
+        { site: 'tex.stackexchange.com', kind: 'answer', id: '605142' },
       ],
       [
         'https://stackoverflow.com/q/11227809/1234',
@@ -820,6 +848,24 @@ describe('Stack Exchange', () => {
     assert.match(hits[1], /\/questions\/261537\?/);
   });
 
+  it('does not credit the asker when the answer has no author', async () => {
+    const { http } = fakeHttp((req) =>
+      req.url.includes('/answers/')
+        ? {
+            headers: { 'content-type': 'application/json' },
+            bytes: new TextEncoder().encode(
+              '{"items":[{"question_id":261537}]}'
+            ),
+          }
+        : apiRoute()(req)
+    );
+    const info = await fetchPageInfo('https://tex.stackexchange.com/a/605142', {
+      http,
+    });
+    assert.match(info?.title ?? '', /^A guide/);
+    assert.equal(info?.author, null);
+  });
+
   it('leaves the API alone when the page loads', async () => {
     const hits: string[] = [];
     const route = apiRoute(hits);
@@ -845,15 +891,23 @@ describe('Stack Exchange', () => {
     await assert.rejects(fetchPageInfo(texQuestion, { http }), BlockedError);
   });
 
-  it('is plain no-title for a missing question that was not blocked', async () => {
-    const { http } = fakeHttp((req) =>
+  it('never asks the API when the page was not blocked', async () => {
+    for (const route of [
+      () => ({ status: 404, html: page('Not found') }),
+      () => ({ html: '<html><body>no title</body></html>' }),
+    ]) {
+      const hits: string[] = [];
+      const api = apiRoute(hits);
+      const { http } = fakeHttp((req) =>
+        req.url.startsWith('https://api.') ? api(req) : route()
+      );
+      assert.equal(await fetchPageInfo(texQuestion, { http }), null);
+      assert.deepEqual(hits, []);
+    }
+    const down = (req: HttpRequest) =>
       req.url.startsWith('https://api.')
-        ? {
-            headers: { 'content-type': 'application/json' },
-            bytes: new TextEncoder().encode('{"items":[]}'),
-          }
-        : { status: 404, html: page('Not found') }
-    );
-    assert.equal(await fetchPageInfo(texQuestion, { http }), null);
+        ? Promise.reject(new Error('should not be asked'))
+        : Promise.reject(new Error('net::ERR_FAILED'));
+    assert.equal(await fetchPageInfo(texQuestion, { http: down }), null);
   });
 });
