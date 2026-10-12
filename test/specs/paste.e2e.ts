@@ -170,7 +170,6 @@ describe('Pasting a URL', function () {
     for (const [what, path] of [
       ['the site answers 404', '/missing'],
       ['the page has no title', '/notitle'],
-      ['the page is a bot challenge', '/challenge'],
     ]) {
       it(`leaves the URL as pasted when ${what}`, async function () {
         await openNote('a ‸ b');
@@ -179,6 +178,21 @@ describe('Pasting a URL', function () {
         expect(await editorValue()).toBe(`a ${base}${path} b`);
         expect((await notices()).join('\n')).toContain(
           "Couldn't find a title for 127.0.0.1."
+        );
+      });
+    }
+
+    for (const [what, path] of [
+      ['answers with a challenge page', '/challenge'],
+      ['refuses the request with a challenge', '/blocked'],
+    ]) {
+      it(`says it was bot protection when the site ${what}`, async function () {
+        await openNote('a ‸ b');
+        await paste(`${base}${path}`);
+        await settled();
+        expect(await editorValue()).toBe(`a ${base}${path} b`);
+        expect((await notices()).join('\n')).toContain(
+          '127.0.0.1 blocked the request with bot protection, so no title was fetched.'
         );
       });
     }

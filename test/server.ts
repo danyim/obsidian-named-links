@@ -83,6 +83,13 @@ function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return html('<html><body>No title here</body></html>');
     case '/challenge':
       return html(page('Just a moment...'));
+    case '/blocked':
+      // What Cloudflare answers a client it won't let through.
+      res.writeHead(403, {
+        'Content-Type': 'text/html',
+        'cf-mitigated': 'challenge',
+      });
+      return res.end(page('Just a moment...'));
     case '/missing':
       res.writeHead(404, { 'Content-Type': 'text/html' });
       return res.end(page('Not Found'));

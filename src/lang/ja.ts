@@ -13,6 +13,8 @@ const ja: Strings = {
   notices: {
     offline: 'インターネット接続がありません。タイトルを取得できません。',
     noTitle: (host: string) => `${host} のタイトルを取得できませんでした。`,
+    blocked: (host: string) =>
+      `${host} がボット対策によりリクエストをブロックしたため、タイトルを取得できませんでした。`,
     noUrlHere: 'タイトルを追加できるURLがありません。',
     noUrlInSelection: '選択範囲にURLがありません。',
     imported: (from: string) => `${from} から設定をインポートしました。`,

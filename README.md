@@ -145,13 +145,14 @@ What's different from Auto Link Title 1.5.5:
 - No LinkPreview.net, and no default hotkeys ([#170](https://github.com/zolrath/obsidian-auto-link-title/issues/170), [#101](https://github.com/zolrath/obsidian-auto-link-title/issues/101)).
 - Legacy encodings such as GBK decode correctly ([#133](https://github.com/zolrath/obsidian-auto-link-title/issues/133)), and YouTube, Vimeo, Spotify and SoundCloud titles come from oEmbed.
 - arXiv PDF links get the paper's title, read from its abstract page, instead of a file name like `2206.08077.pdf` ([#111](https://github.com/zolrath/obsidian-auto-link-title/issues/111)).
+- Stack Exchange links (Stack Overflow and the rest of the network) still get a title when Cloudflare blocks the page, and when any other site's bot protection turns a request away, the notice says so instead of just reporting no title.
 - `.ai` domains, hyphenated hosts, ports and IPs are recognized ([#172](https://github.com/zolrath/obsidian-auto-link-title/issues/172), [#154](https://github.com/zolrath/obsidian-auto-link-title/issues/154)), and `www.` URLs get `https://` ([#12](https://github.com/zolrath/obsidian-auto-link-title/issues/12)).
 - Stuck requests time out instead of leaving `Fetching Title#…` behind ([#167](https://github.com/zolrath/obsidian-auto-link-title/issues/167)).
 - URLs in code and frontmatter are left alone ([#36](https://github.com/zolrath/obsidian-auto-link-title/issues/36), [#21](https://github.com/zolrath/obsidian-auto-link-title/issues/21)), and excluded sites match by domain and can paste as plain URLs ([#159](https://github.com/zolrath/obsidian-auto-link-title/issues/159)).
 
 ## Privacy
 
-Named Links requests the pasted URL from your device, without loading its scripts, images or media, and checks the headers first so large files aren't downloaded. YouTube, Vimeo, Spotify and SoundCloud links go to that site's oEmbed API instead. Excluded sites are never requested, and neither is a link that came with its own title.
+Named Links requests the pasted URL from your device, without loading its scripts, images or media, and checks the headers first so large files aren't downloaded. YouTube, Vimeo, Spotify and SoundCloud links go to that site's oEmbed API instead. When a Stack Exchange site (Stack Overflow and the rest of the network) blocks the request, the question is looked up through the network's API at api.stackexchange.com. Excluded sites are never requested, and neither is a link that came with its own title.
 
 The one opt-in exception: **Fetch X posts through FxTwitter** sends twitter.com and x.com URLs to fxtwitter.com or fixupx.com, a third-party service. There's no telemetry.
 

@@ -81,6 +81,24 @@ const CHALLENGE_TITLES = [
   /^ddos-guard$/i,
 ];
 
+/**
+ * The site answered with a bot-protection gate (a Cloudflare challenge, say)
+ * instead of the page. Thrown, rather than reported as no title, so the
+ * caller can tell the user why the link stayed a bare URL.
+ */
+export class BlockedError extends Error {
+  constructor(readonly host: string) {
+    super(`${host} blocked the request with bot protection`);
+    this.name = 'BlockedError';
+  }
+}
+
+// Statuses a gate answers with, and the server names of the usual gates. A
+// plain 403 from an ordinary server isn't one, and shouldn't be reported as
+// bot protection.
+const GATE_STATUSES = new Set([403, 429, 503]);
+const GATE_SERVERS = /cloudflare|ddos-guard|sucuri|imperva|incapsula/i;
+
 // Sites whose HTML title is missing or generic without JavaScript, but that
 // publish the real one through oEmbed.
 const OEMBED_PROVIDERS: OEmbedProvider[] = [
@@ -150,6 +168,39 @@ export function arxivAbstractUrl(url: string): string | null {
 // preview bots; to anything that looks like a browser it redirects to X.
 const LINK_PREVIEW_USER_AGENT =
   'ObsidianLinkPreview/1.0 (+https://obsidian.md)';
+
+const EXCHANGE_HOST =
+  /^(?:[a-z0-9-]+\.)*(?:stackexchange\.com|stackoverflow\.com|superuser\.com|serverfault\.com|askubuntu\.com|mathoverflow\.net|stackapps\.com)$/i;
+
+// /questions/<id>/<slug>, the /q/<id> share link, and /a/<id> for an answer.
+const EXCHANGE_QUESTION_PATH = /^\/(?:questions|q)\/(\d+)(?:\/|$)/i;
+const EXCHANGE_ANSWER_PATH = /^\/a\/(\d+)(?:\/|$)/i;
+
+const EXCHANGE_API = 'https://api.stackexchange.com/2.3';
+
+export interface ExchangePost {
+  /** The site's domain, which the API accepts as its `site` parameter. */
+  site: string;
+  kind: 'question' | 'answer';
+  id: string;
+}
+
+/**
+ * The question or answer a Stack Exchange network URL points at, or null for
+ * any other URL. The network sits behind Cloudflare, which challenges the
+ * requests Obsidian makes, so its pages often can't be read; its API isn't
+ * behind the challenge.
+ */
+export function exchangePost(url: string): ExchangePost | null {
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase();
+  if (!EXCHANGE_HOST.test(host)) return null;
+  const site = host.replace(/^www\./, '');
+  const answer = parsed.pathname.match(EXCHANGE_ANSWER_PATH);
+  if (answer) return { site, kind: 'answer', id: answer[1] };
+  const question = parsed.pathname.match(EXCHANGE_QUESTION_PATH);
+  return question ? { site, kind: 'question', id: question[1] } : null;
+}
 
 function header(res: HttpResponse, name: string): string | undefined {
   const wanted = name.toLowerCase();
@@ -228,6 +279,15 @@ function parseHtml(html: string): Document {
 
 function metaContent(doc: Document, selector: string): string | null {
   return doc.querySelector(selector)?.getAttribute('content') ?? null;
+}
+
+/** Whether a document is a bot-protection interstitial, not the page. */
+function isChallengePage(doc: Document): boolean {
+  const titleEl = Array.from(doc.querySelectorAll('title')).find(
+    (el) => !el.closest('svg')
+  );
+  const title = text(titleEl?.textContent);
+  return title !== null && CHALLENGE_TITLES.some((re) => re.test(title));
 }
 
 function titleOf(doc: Document, preferOpenGraph: boolean): string | null {
@@ -489,9 +549,89 @@ async function arxivInfo(
   return citation ? { ...info, title: citation } : info;
 }
 
+/** The first item an API call returns, or null for none or a bad answer. */
+async function exchangeItem(
+  path: string,
+  site: string,
+  options: FetchTitleOptions,
+  headers: Record<string, string>
+): Promise<Record<string, unknown> | null> {
+  const res = await tryRequest(options.http, {
+    url: `${EXCHANGE_API}/${path}?site=${encodeURIComponent(site)}`,
+    method: 'GET',
+    headers: { ...headers, Accept: 'application/json' },
+  });
+  if (!res || res.status >= 400) return null;
+  try {
+    const data = JSON.parse(new TextDecoder('utf-8').decode(res.body())) as {
+      items?: unknown[];
+    };
+    const first = Array.isArray(data.items) ? data.items[0] : null;
+    return first && typeof first === 'object'
+      ? (first as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The API sends titles and names with HTML entities, such as `&#39;`. */
+function decodeEntities(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const doc = parseHtml(`<!doctype html><body>${value}`);
+  return text(doc.documentElement.textContent);
+}
+
+function ownerName(item: Record<string, unknown>): string | null {
+  const owner = item.owner as { display_name?: unknown } | undefined;
+  return decodeEntities(owner?.display_name);
+}
+
+/**
+ * What the Stack Exchange API says about the question a URL points at. An
+ * answer link takes a second request, to find its question. The author is
+ * whoever wrote the post the link points at.
+ */
+async function exchangeInfo(
+  post: ExchangePost,
+  options: FetchTitleOptions,
+  headers: Record<string, string>
+): Promise<PageInfo | null> {
+  let questionId = post.id;
+  let author: string | null = null;
+  if (post.kind === 'answer') {
+    const answer = await exchangeItem(
+      `answers/${post.id}`,
+      post.site,
+      options,
+      headers
+    );
+    if (!answer || typeof answer.question_id !== 'number') return null;
+    questionId = String(answer.question_id);
+    author = ownerName(answer);
+  }
+
+  const question = await exchangeItem(
+    `questions/${questionId}`,
+    post.site,
+    options,
+    headers
+  );
+  const title = question ? usable(decodeEntities(question.title)) : null;
+  if (!question || !title) return null;
+  return {
+    title,
+    siteName: null,
+    author: author ?? ownerName(question),
+    description: null,
+    section: null,
+  };
+}
+
 /**
  * The title for a URL, or null when none could be found: the site is
- * unreachable, answered with an error, or its page has no title.
+ * unreachable, answered with an error, or its page has no title. Throws
+ * BlockedError when bot protection stood in the way.
  */
 export async function fetchTitle(
   url: string,
@@ -503,7 +643,8 @@ export async function fetchTitle(
 /**
  * What the page at a URL says about itself, or null when no title could be
  * found: the site is unreachable, answered with an error, or its page has no
- * title.
+ * title. Throws BlockedError when bot protection stood in the way and
+ * nothing else could name the page.
  */
 export async function fetchPageInfo(
   url: string,
@@ -548,6 +689,25 @@ export async function fetchPageInfo(
     if (!missing) return embedded;
     const page = await pageInfoFromHtml(absolute, options, headers);
     return page ? mergePageInfo(embedded, page) : embedded;
+  }
+
+  const exchange = exchangePost(absolute);
+  if (exchange) {
+    // The page comes first: it knows the site's name, and a request that
+    // gets through costs the API's small anonymous quota nothing. The API
+    // only steps in for a page that can't be read.
+    let blocked: BlockedError | null = null;
+    try {
+      const html = await pageInfoFromHtml(absolute, options, headers);
+      if (html) return html;
+    } catch (e) {
+      if (!(e instanceof BlockedError)) throw e;
+      blocked = e;
+    }
+    const api = await exchangeInfo(exchange, options, headers);
+    if (api) return api;
+    if (blocked) throw blocked;
+    return null;
   }
 
   return pageInfoFromHtml(absolute, options, headers);
@@ -610,12 +770,34 @@ async function pageInfoFromHtml(
     method: 'GET',
     headers,
   });
-  if (!res || res.status >= 400) return null;
+  if (!res) return null;
+  if (res.status >= 400) {
+    if (isGate(res)) throw new BlockedError(hostnameOf(absolute));
+    return null;
+  }
 
   const contentType = header(res, 'content-type');
   if (!isHtml(contentType)) {
     return namedOnly(fileNameFromUrl(absolute) ?? hostnameOf(absolute));
   }
 
-  return extractPageInfo(decodeHtml(res.body(), contentType), absolute);
+  const html = decodeHtml(res.body(), contentType);
+  const info = extractPageInfo(html, absolute);
+  // Some gates answer 200, and their title names the gate, not the page.
+  if (!info && isChallengePage(parseHtml(html))) {
+    throw new BlockedError(hostnameOf(absolute));
+  }
+  return info;
+}
+
+/** Whether an error response is a bot-protection gate, not a plain error. */
+function isGate(res: HttpResponse): boolean {
+  if (!GATE_STATUSES.has(res.status)) return false;
+  if (header(res, 'cf-mitigated')) return true;
+  if (GATE_SERVERS.test(header(res, 'server') ?? '')) return true;
+  const contentType = header(res, 'content-type');
+  return (
+    isHtml(contentType) &&
+    isChallengePage(parseHtml(decodeHtml(res.body(), contentType)))
+  );
 }

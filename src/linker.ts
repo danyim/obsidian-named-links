@@ -25,7 +25,7 @@ import {
   renderLink,
   templateFor,
 } from './linkFormat';
-import type { PageInfo } from './scraper';
+import { BlockedError, type PageInfo } from './scraper';
 import { NamedLinksSettings, isExcluded, parseExcludedSites } from './settings';
 import { readableTitle } from './title';
 import {
@@ -395,10 +395,12 @@ export class Linker {
     item: PendingTitle
   ): Promise<void> {
     let page: PageInfo | null = null;
+    let blocked = false;
     try {
       page = await this.host.fetchPageInfo(item.url);
     } catch (e) {
-      console.error('Named Links: fetching a title failed', e);
+      if (e instanceof BlockedError) blocked = true;
+      else console.error('Named Links: fetching a title failed', e);
     }
     const title = page?.title ?? null;
 
@@ -406,7 +408,10 @@ export class Linker {
     // fallback is that link with the page's fields empty, so there is
     // nothing to tell the user.
     if (title === null && item.knownTitle === undefined) {
-      new Notice(t().notices.noTitle(hostnameOf(item.url)));
+      const host = hostnameOf(item.url);
+      new Notice(
+        blocked ? t().notices.blocked(host) : t().notices.noTitle(host)
+      );
     }
 
     const replacement = (destination: string) =>
