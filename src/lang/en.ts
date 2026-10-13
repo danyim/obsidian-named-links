@@ -8,6 +8,8 @@ const en = {
   notices: {
     offline: 'No internet connection, so no title was fetched.',
     noTitle: (host: string) => `Couldn't find a title for ${host}.`,
+    blocked: (host: string) =>
+      `${host} blocked the request with bot protection, so no title was fetched.`,
     noUrlHere: 'There is no URL here to add a title to.',
     noUrlInSelection: 'The selection has no URL in it.',
     imported: (from: string) => `Imported settings from ${from}.`,

@@ -15,8 +15,8 @@ for this project's actual conventions. For anything not covered here, see
 - Release artifacts: `main.js`, `manifest.json`, `styles.css`, plus a
   `named-links-<version>.zip` of the three for manual installs.
 - Makes network requests, by design: to the URL being titled (for an arXiv
-  paper, its abstract page), and to oEmbed endpoints for a few video and
-  music sites. Settings are the only persisted state, stored via
+  paper, its abstract page), to oEmbed endpoints for a few video and music
+  sites, and to the Stack Exchange API when a network site blocks the page. Settings are the only persisted state, stored via
   `loadData()`/`saveData()`.
 
 ## Environment & tooling
@@ -155,7 +155,9 @@ Specific to this plugin:
   not reintroduce Electron `BrowserWindow`s, `webview`s or iframes to load
   pages; that was the upstream plugin's most serious problem.
 - Network requests go only to the URL being titled (for an arXiv paper, its
-  abstract page) and to the oEmbed endpoints in `scraper.ts`. Any other destination (like the FxTwitter option)
+  abstract page), to the oEmbed endpoints in `scraper.ts`, and, for a
+  Stack Exchange network URL whose page is blocked, to
+  `api.stackexchange.com`. Any other destination (like the FxTwitter option)
   must be opt-in, off by default, and disclosed in the README's Privacy
   section and in the setting's description.
 - Every request goes through `http.ts`, which enforces a timeout.

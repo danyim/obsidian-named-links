@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 
 import {
+  BlockedError,
   HttpRequest,
   HttpResponse,
   arxivAbstractUrl,
   decodeHtml,
+  exchangePost,
   extractPageInfo,
   extractSection,
   extractSiteName,
@@ -649,5 +651,263 @@ describe('fetchPageInfo after oEmbed', () => {
     });
     assert.equal(info?.title, 'A video');
     assert.equal(info?.description, null);
+  });
+});
+
+describe('bot protection', () => {
+  const gate = {
+    status: 403,
+    headers: {
+      'content-type': 'text/html; charset=UTF-8',
+      'cf-mitigated': 'challenge',
+    },
+    html: page('Just a moment...'),
+  };
+
+  it('throws when a Cloudflare challenge answers instead of the page', async () => {
+    const { http } = fakeHttp(() => gate);
+    await assert.rejects(
+      fetchPageInfo('https://example.com/post', { http }),
+      BlockedError
+    );
+  });
+
+  it('recognizes a gate by its server header alone', async () => {
+    const { http } = fakeHttp(() => ({
+      status: 429,
+      headers: { 'content-type': 'text/plain', server: 'cloudflare' },
+    }));
+    await assert.rejects(
+      fetchPageInfo('https://example.com/post', { http }),
+      BlockedError
+    );
+  });
+
+  it('recognizes a gate by the title of its error page', async () => {
+    const { http } = fakeHttp(() => ({
+      status: 503,
+      html: page('Attention Required! | Cloudflare'),
+    }));
+    await assert.rejects(
+      fetchPageInfo('https://example.com/post', { http }),
+      BlockedError
+    );
+  });
+
+  it('throws for a challenge page served with a 200', async () => {
+    const { http } = fakeHttp(() => ({ html: page('Just a moment...') }));
+    await assert.rejects(
+      fetchPageInfo('https://example.com/post', { http }),
+      BlockedError
+    );
+  });
+
+  it('does not call a plain 403 or a 404 bot protection', async () => {
+    for (const status of [403, 404, 500]) {
+      const { http } = fakeHttp(() => ({ status, html: page('Nope') }));
+      assert.equal(
+        await fetchPageInfo('https://example.com/post', { http }),
+        null
+      );
+    }
+  });
+});
+
+describe('bot protection after oEmbed', () => {
+  it('keeps the oEmbed result when the supplemental page is blocked', async () => {
+    const { http } = fakeHttp((req): ReturnType<Route> =>
+      req.url.startsWith('https://www.youtube.com/oembed')
+        ? {
+            headers: { 'content-type': 'application/json' },
+            bytes: new TextEncoder().encode(
+              JSON.stringify({ title: 'A video', author_name: 'A channel' })
+            ),
+          }
+        : {
+            status: 403,
+            headers: {
+              'content-type': 'text/html',
+              'cf-mitigated': 'challenge',
+            },
+            html: page('Just a moment...'),
+          }
+    );
+    const info = await fetchPageInfo('https://www.youtube.com/watch?v=abc', {
+      http,
+      fields: ['description'],
+    });
+    assert.equal(info?.title, 'A video');
+    assert.equal(info?.description, null);
+  });
+});
+
+describe('Stack Exchange', () => {
+  const texQuestion =
+    'https://tex.stackexchange.com/questions/261537/a-guide-on-how-to-produce-accessible-pdf-files';
+
+  it('finds the post a URL points at', () => {
+    const cases: [string, unknown][] = [
+      [
+        texQuestion,
+        { site: 'tex.stackexchange.com', kind: 'question', id: '261537' },
+      ],
+      [
+        'https://tex.stackexchange.com/questions/261537/slug/605142#605142',
+        { site: 'tex.stackexchange.com', kind: 'answer', id: '605142' },
+      ],
+      [
+        'https://stackoverflow.com/q/11227809/1234',
+        { site: 'stackoverflow.com', kind: 'question', id: '11227809' },
+      ],
+      [
+        'https://tex.stackexchange.com/a/605142/153678',
+        { site: 'tex.stackexchange.com', kind: 'answer', id: '605142' },
+      ],
+      [
+        'https://www.superuser.com/questions/42/x',
+        { site: 'superuser.com', kind: 'question', id: '42' },
+      ],
+      [
+        'https://meta.stackoverflow.com/questions/7/x',
+        { site: 'meta.stackoverflow.com', kind: 'question', id: '7' },
+      ],
+      [
+        'https://mathoverflow.net/q/1',
+        { site: 'mathoverflow.net', kind: 'question', id: '1' },
+      ],
+      ['https://stackoverflow.com/questions/ask', null],
+      ['https://stackoverflow.com/questions/tagged/java', null],
+      ['https://stackoverflow.com/users/1/jon', null],
+      ['https://notstackoverflow.com/q/1', null],
+      ['https://stackoverflow.com.evil.example/q/1', null],
+      ['https://example.com/questions/1/x', null],
+    ];
+    for (const [url, expected] of cases) {
+      assert.deepEqual(exchangePost(url), expected, url);
+    }
+  });
+
+  const apiRoute =
+    (hits: string[] = []) =>
+    (req: HttpRequest): ReturnType<Route> => {
+      if (!req.url.startsWith('https://api.stackexchange.com/2.3/')) {
+        return {
+          status: 403,
+          headers: {
+            'content-type': 'text/html',
+            'cf-mitigated': 'challenge',
+          },
+          html: page('Just a moment...'),
+        };
+      }
+      hits.push(req.url);
+      const body = req.url.includes('/answers/')
+        ? {
+            items: [{ question_id: 261537, owner: { display_name: 'Ulrike' } }],
+          }
+        : {
+            items: [
+              {
+                title:
+                  'A guide on how to produce accessible PDF files? &amp; it&#39;s tricky',
+                owner: { display_name: 'Thomas' },
+              },
+            ],
+          };
+      return {
+        headers: { 'content-type': 'application/json' },
+        bytes: new TextEncoder().encode(JSON.stringify(body)),
+      };
+    };
+
+  it('asks the API when the page is blocked', async () => {
+    const hits: string[] = [];
+    const { http } = fakeHttp(apiRoute(hits));
+    const info = await fetchPageInfo(texQuestion, { http });
+    assert.equal(
+      info?.title,
+      "A guide on how to produce accessible PDF files? & it's tricky"
+    );
+    assert.equal(info?.author, 'Thomas');
+    assert.deepEqual(hits, [
+      'https://api.stackexchange.com/2.3/questions/261537?site=tex.stackexchange.com',
+    ]);
+  });
+
+  it('follows an answer link to its question, crediting the answerer', async () => {
+    const hits: string[] = [];
+    const { http } = fakeHttp(apiRoute(hits));
+    const info = await fetchPageInfo(
+      'https://tex.stackexchange.com/a/605142/153678',
+      { http }
+    );
+    assert.match(info?.title ?? '', /^A guide on how to produce/);
+    assert.equal(info?.author, 'Ulrike');
+    assert.equal(hits.length, 2);
+    assert.match(hits[0], /\/answers\/605142\?site=tex\.stackexchange\.com$/);
+    assert.match(hits[1], /\/questions\/261537\?/);
+  });
+
+  it('does not credit the asker when the answer has no author', async () => {
+    const { http } = fakeHttp((req) =>
+      req.url.includes('/answers/')
+        ? {
+            headers: { 'content-type': 'application/json' },
+            bytes: new TextEncoder().encode(
+              '{"items":[{"question_id":261537}]}'
+            ),
+          }
+        : apiRoute()(req)
+    );
+    const info = await fetchPageInfo('https://tex.stackexchange.com/a/605142', {
+      http,
+    });
+    assert.match(info?.title ?? '', /^A guide/);
+    assert.equal(info?.author, null);
+  });
+
+  it('leaves the API alone when the page loads', async () => {
+    const hits: string[] = [];
+    const route = apiRoute(hits);
+    const { http } = fakeHttp((req) =>
+      req.url.startsWith('https://api.')
+        ? route(req)
+        : { html: page('Real title - TeX Stack Exchange') }
+    );
+    const info = await fetchPageInfo(texQuestion, { http });
+    assert.equal(info?.title, 'Real title - TeX Stack Exchange');
+    assert.deepEqual(hits, []);
+  });
+
+  it('still reports bot protection when the API has nothing either', async () => {
+    const { http } = fakeHttp((req) =>
+      req.url.startsWith('https://api.')
+        ? {
+            headers: { 'content-type': 'application/json' },
+            bytes: new TextEncoder().encode('{"items":[]}'),
+          }
+        : apiRoute()(req)
+    );
+    await assert.rejects(fetchPageInfo(texQuestion, { http }), BlockedError);
+  });
+
+  it('never asks the API when the page was not blocked', async () => {
+    for (const route of [
+      () => ({ status: 404, html: page('Not found') }),
+      () => ({ html: '<html><body>no title</body></html>' }),
+    ]) {
+      const hits: string[] = [];
+      const api = apiRoute(hits);
+      const { http } = fakeHttp((req) =>
+        req.url.startsWith('https://api.') ? api(req) : route()
+      );
+      assert.equal(await fetchPageInfo(texQuestion, { http }), null);
+      assert.deepEqual(hits, []);
+    }
+    const down = (req: HttpRequest) =>
+      req.url.startsWith('https://api.')
+        ? Promise.reject(new Error('should not be asked'))
+        : Promise.reject(new Error('net::ERR_FAILED'));
+    assert.equal(await fetchPageInfo(texQuestion, { http: down }), null);
   });
 });
