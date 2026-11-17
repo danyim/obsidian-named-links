@@ -93,6 +93,40 @@ describe('Commands', function () {
     });
   });
 
+  describe('Refresh the titles of links in the selection', function () {
+    it('retitles links and bare URLs in a selection, skipping code', async function () {
+      const a = `${base}/page?title=A`;
+      const b = `${base}/page?title=B`;
+      const auto = `${base}/page?title=Auto`;
+      const code = `\`[stale](${base}/page?title=Code)\``;
+      await openNote(
+        `«[stale](${a}) ${code}\n- ${b}\n<${auto}> [kept](${base}/missing)»`,
+        { source: true }
+      );
+      await runCommand('retitle-links');
+      await settled();
+      expect(await editorValue()).toBe(
+        `[A](${a}) ${code}\n- [B](${b})\n[Auto](${auto}) [kept](${base}/missing)`
+      );
+    });
+
+    it('retitles the link under the cursor without a selection', async function () {
+      const url = `${base}/page?title=Fresh`;
+      await openNote(`a [stale‸ text](${url}) b`, { source: true });
+      await runCommand('retitle-links');
+      await settled();
+      expect(await editorValue()).toBe(`a [Fresh](${url}) b`);
+    });
+
+    it('says so when the selection has no link', async function () {
+      await openNote('«just words»');
+      await runCommand('retitle-links');
+      await settled();
+      expect(await editorValue()).toBe('just words');
+      expect(await notices()).toContain('The selection has no URL in it.');
+    });
+  });
+
   describe('Paste URL and fetch its title', function () {
     it('titles the URL on the clipboard', async function () {
       const url = `${base}/page?title=Clipped`;
