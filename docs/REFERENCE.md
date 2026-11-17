@@ -17,6 +17,7 @@ None has a default hotkey; set one under Settings → Hotkeys.
 | Command | What it does |
 | --- | --- |
 | Add a title to an existing URL | Titles the URL under the cursor, replacing a `[text](url)` link's text or turning a `<URL>` autolink into a link. With a selection, titles every bare URL in it, skipping code, frontmatter and URLs already in links. |
+| Refresh the titles of links in the selection | Fetches a new title for every link in the selection, replacing the text of `[text](url)` links as well as titling bare URLs. A link whose title can't be found keeps its text. Skips code and frontmatter. With nothing selected, it works like **Add a title to an existing URL**. |
 | Paste URL and fetch its title | Pastes and titles the clipboard's URLs, even with **Title pasted URLs** off. |
 | Paste without fetching a title | Pastes the clipboard as it is. |
 

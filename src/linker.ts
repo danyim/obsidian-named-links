@@ -485,7 +485,7 @@ export class Linker {
    */
   async enhance(editor: Editor, file: TFile | null): Promise<void> {
     if (editor.somethingSelected()) {
-      await this.enhanceSelection(editor, file);
+      await this.enhanceSelection(editor, file, false);
       return;
     }
 
@@ -530,13 +530,29 @@ export class Linker {
   }
 
   /**
+   * Fetches a fresh title for every link the selection touches, replacing
+   * the text of `[text](url)` links as well as titling bare URLs (#28). A
+   * link whose title can't be found keeps the text it had. Without a
+   * selection, it titles the link under the cursor, as `enhance` does.
+   */
+  async retitle(editor: Editor, file: TFile | null): Promise<void> {
+    if (editor.somethingSelected()) {
+      await this.enhanceSelection(editor, file, true);
+      return;
+    }
+    await this.enhance(editor, file);
+  }
+
+  /**
    * Every bare URL the selection touches, whole: a selection that starts or
    * ends partway through a URL still titles all of it, rather than linking
-   * the part selected and leaving the rest trailing after the link.
+   * the part selected and leaving the rest trailing after the link. With
+   * `retitle`, links that already have text are titled again too.
    */
   private async enhanceSelection(
     editor: Editor,
-    file: TFile | null
+    file: TFile | null,
+    retitle: boolean
   ): Promise<void> {
     const from = editor.getCursor('from');
     const to = editor.getCursor('to');
@@ -549,7 +565,7 @@ export class Linker {
       const selStart = ln === from.line ? from.ch : 0;
       const selEnd = ln === to.line ? to.ch : line.length;
       for (const link of findLinks(line)) {
-        if (link.text !== undefined) continue;
+        if (link.text !== undefined && !retitle) continue;
         if (link.end <= selStart || link.start >= selEnd) continue;
         const offset = editor.posToOffset({ line: ln, ch: link.start });
         if (isInCode(text, offset) || isInFrontmatter(text, offset)) continue;

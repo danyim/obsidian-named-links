@@ -9,6 +9,7 @@ const ja: Strings = {
     pasteWithTitle: 'URLを貼り付けてタイトルを自動取得',
     pasteWithoutTitle: '通常の貼り付け（タイトル取得なし）',
     enhance: '既存のURLにリンクとタイトルを追加',
+    retitle: '選択範囲のリンクのタイトルを再取得',
   },
   notices: {
     offline: 'インターネット接続がありません。タイトルを取得できません。',

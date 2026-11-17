@@ -4,6 +4,7 @@ const en = {
     pasteWithTitle: 'Paste URL and fetch its title',
     pasteWithoutTitle: 'Paste without fetching a title',
     enhance: 'Add a title to an existing URL',
+    retitle: 'Refresh the titles of links in the selection',
   },
   notices: {
     offline: 'No internet connection, so no title was fetched.',

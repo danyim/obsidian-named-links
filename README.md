@@ -14,7 +14,7 @@ Paste a URL into Obsidian and get a markdown link titled with the page's name: `
 - **Copy a link with its text** (Edge's Copy link, Firefox, or a link dragged out of a page) and that text is the title, with nothing fetched, so it works for pages behind a login.
 - **Paste a URL over selected text** to link that text instead of fetching a title.
 - **Paste text over a selected URL** to make the text its title (off until you turn it on).
-- **Title URLs already in a note** with the **Add a title to an existing URL** command, at the cursor or across a selection.
+- **Title URLs already in a note** with the **Add a title to an existing URL** command, at the cursor or across a selection, or fetch new titles for links that already have one with **Refresh the titles of links in the selection**.
 - **In vim mode**, putting a URL with `p` or `P` titles it too.
 - **Undo** gives back the URL as you pasted it; undo again to remove the paste.
 

@@ -228,6 +228,15 @@ export default class NamedLinksPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'retitle-links',
+      name: t().commands.retitle,
+      editorCallback: (editor, info) => {
+        if (!this.checkOnline()) return;
+        this.track(this.linker.retitle(editor, fileOf(info)));
+      },
+    });
+
     await this.checkForAutoLinkTitleData();
   }
 
