@@ -276,6 +276,23 @@ describe('findLinks and linkAt', () => {
     assert.equal(link.url, 'https://example.com/a');
   });
 
+  it('keeps a trailing underscore that closes no emphasis (#29)', () => {
+    const [link] = findLinks('see https://x.com/JINYouTube_ now');
+    assert.equal(link.url, 'https://x.com/JINYouTube_');
+  });
+
+  it('trims emphasis markers wrapped around a URL', () => {
+    for (const [line, url] of [
+      ['_https://example.com_', 'https://example.com'],
+      ['**https://example.com**.', 'https://example.com'],
+      ['~~https://example.com~~', 'https://example.com'],
+      ['*https://x.com/JINYouTube_*', 'https://x.com/JINYouTube_'],
+      ['_https://x.com/JINYouTube__', 'https://x.com/JINYouTube_'],
+    ]) {
+      assert.equal(findLinks(line)[0]?.url, url, line);
+    }
+  });
+
   it("doesn't treat an image embed as a link", () => {
     const links = findLinks('![alt](https://example.com/a.png)');
     assert.equal(
@@ -293,6 +310,15 @@ describe('findLinks and linkAt', () => {
     const link = linkAt(line, 10);
     assert.equal(line.slice(link!.start, link!.end), '<https://example.com>');
     assert.equal(link!.url, 'https://example.com');
+  });
+
+  it('takes everything inside an autolink, trailing punctuation too (#29)', () => {
+    for (const url of ['https://x.com/JINYouTube_', 'https://example.com/a.']) {
+      const line = `see <${url}> now`;
+      const link = linkAt(line, 8);
+      assert.equal(line.slice(link!.start, link!.end), `<${url}>`);
+      assert.equal(link!.url, url);
+    }
   });
 
   it('leaves URLs that are already part of markup alone', () => {

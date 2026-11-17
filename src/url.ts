@@ -257,18 +257,34 @@ const MARKDOWN_LINK =
   /\[((?:\\.|[^\]\\])*)\]\((<[^>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)\)/g;
 
 // A bare URL runs to the next whitespace or angle bracket. Trailing sentence
-// punctuation and an unmatched closing parenthesis are trimmed afterwards.
+// punctuation, emphasis markers and an unmatched closing parenthesis are
+// trimmed afterwards.
 const BARE_URL = /(?:https?:\/\/|www\.)[^\s<>]+/gi;
 
-function trimBareUrl(raw: string): string {
-  let url = raw.replace(/[.,;:!?'"*_~]+$/, '');
-  while (url.endsWith(')')) {
-    const opens = url.split('(').length - 1;
-    const closes = url.split(')').length - 1;
-    if (closes <= opens) break;
-    url = url.slice(0, -1).replace(/[.,;:!?'"*_~]+$/, '');
+/**
+ * `raw` without the punctuation that ends the sentence or markup around it.
+ * `before` is the line up to the URL. An emphasis marker (`*`, `_`, `~`) is
+ * trimmed only when it closes one opened right before the URL, as in
+ * `_https://example.com_`: URLs can end in an underscore (#29).
+ */
+function trimBareUrl(raw: string, before: string): string {
+  // Closing markers mirror the opening ones, so the URL's last character
+  // pairs with the first opener.
+  let openers = /[*_~]+$/.exec(before)?.[0] ?? '';
+  let url = raw;
+  for (;;) {
+    const last = url.slice(-1);
+    if (/[.,;:!?'"]/.test(last)) {
+      url = url.slice(0, -1);
+    } else if (last !== '' && openers.startsWith(last)) {
+      url = url.slice(0, -1);
+      openers = openers.slice(1);
+    } else if (last === ')' && url.split(')').length > url.split('(').length) {
+      url = url.slice(0, -1);
+    } else {
+      return url;
+    }
   }
-  return url;
 }
 
 /**
@@ -311,16 +327,20 @@ export function findLinks(line: string): LinkAtCursor[] {
     // reference definition's target.
     if (/(?:["'=]|\]\()$/.test(before)) continue;
     if (/^\s{0,3}\[[^\]]+\]:\s*$/.test(before)) continue;
-    const url = trimBareUrl(match[0]);
-    if (!isUrl(url)) continue;
-    const end = start + url.length;
     // A <https://...> autolink is taken whole, brackets included, so it
-    // becomes a titled link rather than one nested inside the brackets.
-    if (before.endsWith('<') && line[end] === '>') {
-      found.push({ start: start - 1, end: end + 1, url });
-    } else if (!before.endsWith('<')) {
-      found.push({ start, end, url });
+    // becomes a titled link rather than one nested inside the brackets. Its
+    // URL is everything up to the `>`, with nothing trimmed.
+    if (before.endsWith('<')) {
+      const url = match[0];
+      const end = start + url.length;
+      if (line[end] === '>' && isUrl(url)) {
+        found.push({ start: start - 1, end: end + 1, url });
+      }
+      continue;
     }
+    const url = trimBareUrl(match[0], before);
+    if (!isUrl(url)) continue;
+    found.push({ start, end: start + url.length, url });
   }
 
   return found.sort((a, b) => a.start - b.start);
